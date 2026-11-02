@@ -189,7 +189,7 @@ export default function Home() {
     async (forceRemote = false, specificDate?: string) => {
       if (forceRemote) setIsRefreshing(true);
 
-      // FASE 1: Idratazione ISTANTANEA da IndexedDB (0ms latenza offline)
+      // FASE 1: Idratazione ISTANTANEA da IndexedDB / Seed (0ms latenza offline)
       try {
         let cached: DailyBriefing | null = null;
         if (specificDate) {
@@ -201,28 +201,36 @@ export default function Home() {
         if (cached && cached.articles && cached.articles.length > 0) {
           setBriefing(cached);
           setSource('cache');
-          setIsLoading(false);
         } else if (!briefing && !specificDate) {
           // Primo avvio in assoluto: pre-carica con seed dimostrativo
           setBriefing(SEED_BRIEFING);
           setSource('seed');
           await saveBriefing(SEED_BRIEFING).catch(() => {});
-          setIsLoading(false);
         }
       } catch (err) {
         console.warn('[IDB] Errore lettura cache:', err);
+      } finally {
+        // Mostra immediatamente l'interfaccia dopo la lettura locale (entro 50ms)
+        setIsLoading(false);
       }
 
-      // FASE 2: Revalidazione remota in background (se online e non data passata statica)
+      // FASE 2: Revalidazione remota in background con timeout rigido (2000ms)
+      // Impedisce il freeze di iOS WebKit su connessioni instabili o host irraggiungibili
       if ((navigator.onLine || forceRemote) && !specificDate) {
         try {
           const supabase = createClient();
-          const { data, error } = await supabase
+          const supabaseQueryPromise = supabase
             .from('daily_briefings')
             .select('*')
             .order('date', { ascending: false })
             .limit(1)
             .maybeSingle();
+
+          const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: { message: 'Timeout sincronizzazione remota' } }), 2000)
+          );
+
+          const { data, error } = await Promise.race([supabaseQueryPromise, timeoutPromise]);
 
           const remoteRow = data as unknown as DailyBriefing | null;
           if (!error && remoteRow && Array.isArray(remoteRow.articles)) {
@@ -250,6 +258,11 @@ export default function Home() {
 
   useEffect(() => {
     loadBriefing();
+    // Watchdog timer: garantisce che lo skeleton non rimanga mai appeso su iPhone
+    const watchdog = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    return () => clearTimeout(watchdog);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -426,19 +439,19 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh bg-[#000000] text-white flex flex-col selection:bg-[#2997ff]/30 selection:text-white font-sans antialiased">
-      {/* Background ambient cosmic mesh glow */}
+      {/* Background ambient cosmic mesh glow - Ottimizzato GPU per iPhone WebKit */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div
-          className="absolute -top-40 -left-40 w-[32rem] h-[32rem] rounded-full opacity-[0.07] blur-[120px]"
-          style={{ background: 'radial-gradient(circle, #2997ff 0%, transparent 70%)' }}
+          className="absolute -top-40 -left-40 w-[32rem] h-[32rem] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(41, 151, 255, 0.08) 0%, transparent 70%)' }}
         />
         <div
-          className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] rounded-full opacity-[0.06] blur-[120px]"
-          style={{ background: 'radial-gradient(circle, #bf5af2 0%, transparent 70%)' }}
+          className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(191, 90, 242, 0.07) 0%, transparent 70%)' }}
         />
         <div
-          className="absolute -bottom-40 left-1/4 w-[34rem] h-[34rem] rounded-full opacity-[0.05] blur-[120px]"
-          style={{ background: 'radial-gradient(circle, #30d158 0%, transparent 70%)' }}
+          className="absolute -bottom-40 left-1/4 w-[34rem] h-[34rem] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(48, 209, 88, 0.06) 0%, transparent 70%)' }}
         />
       </div>
 
@@ -488,10 +501,10 @@ export default function Home() {
           />
         )}
 
-        {/* Barra di Ricerca Client-Side Istantanea Apple Spotlight Style */}
+        {/* Barra di Ricerca Client-Side Istantanea Apple Spotlight Style & Filtri Categorie */}
         <div className="space-y-3.5 mb-6">
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
-          <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <CategoryFilter
                 selected={selectedCategory}
@@ -500,7 +513,10 @@ export default function Home() {
                 bookmarkCount={bookmarks.length}
               />
             </div>
-            <div className="flex-shrink-0">
+            <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0 pt-1 md:pt-0 border-t border-white/[0.06] md:border-t-0">
+              <span className="text-[11px] font-semibold text-[#86868b] uppercase tracking-wider md:hidden">
+                Layout
+              </span>
               <ViewDensityToggle density={density} onChange={handleDensityChange} />
             </div>
           </div>
@@ -593,7 +609,7 @@ export default function Home() {
             }}
           />
         ) : (
-          <motion.div className={feedGridClass} layout>
+          <motion.div className={feedGridClass}>
             <AnimatePresence mode="popLayout">
               {feedArticles.map((article, i) => (
                 <NewsCard

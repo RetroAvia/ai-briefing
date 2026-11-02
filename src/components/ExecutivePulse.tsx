@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Layers, Network, Clock, Share2, Sparkles, HardDrive, CheckCircle2 } from 'lucide-react';
+import { useMemo } from 'react';
 import type { DailyBriefing } from '@/types';
 import { triggerHaptic } from '@/lib/export';
 
@@ -20,10 +21,21 @@ export default function ExecutivePulse({
   onExport,
   isOnline,
 }: ExecutivePulseProps) {
-  const articles = Array.isArray(briefing?.articles) ? briefing.articles : [];
+  const articles = useMemo(
+    () => (Array.isArray(briefing?.articles) ? briefing.articles : []),
+    [briefing]
+  );
   const totalMinutes = articles.reduce((acc, a) => acc + (a.readingTimeMinutes || 2), 0);
-  const techCount = articles.filter((a) => a.category === 'Tech & AI').length;
-  const ecoCount = articles.filter((a) => a.category === 'Mercati & Economia').length;
+
+  const topTopic = useMemo(() => {
+    if (!articles.length) return 'Varie';
+    const counts: Record<string, number> = {};
+    for (const a of articles) {
+      counts[a.category] = (counts[a.category] || 0) + 1;
+    }
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || 'Tech & AI';
+  }, [articles]);
 
   return (
     <motion.div
@@ -32,9 +44,9 @@ export default function ExecutivePulse({
       transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
       className="mb-6 rounded-[24px] p-5 sm:p-6 border relative overflow-hidden"
       style={{
-        background: 'rgba(20, 20, 26, 0.65)',
-        backdropFilter: 'blur(25px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(25px) saturate(180%)',
+        background: 'rgba(20, 20, 26, 0.88)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
         borderColor: 'rgba(255, 255, 255, 0.08)',
         boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
       }}
@@ -130,7 +142,7 @@ export default function ExecutivePulse({
           <div className="min-w-0">
             <p className="text-[10px] uppercase font-bold text-[#86868b] tracking-[0.06em]">Topic Prevalente</p>
             <p className="text-xs font-bold text-[#f5f5f7] truncate">
-              {techCount >= ecoCount ? 'Tech & Intelligenza Artificiale' : 'Finanza & Mercati Globali'}
+              {topTopic}
             </p>
           </div>
         </div>

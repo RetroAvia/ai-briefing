@@ -47,7 +47,15 @@ const ARTICLES_SCHEMA = {
           title: { type: 'string', description: 'Titolo incisivo in italiano (max 120 caratteri)' },
           category: {
             type: 'string',
-            enum: ['Tech & AI', 'Mercati & Economia', 'Geopolitica', 'Scienza', 'Italia', 'Altro'],
+            enum: [
+              'Tech & AI',
+              'Mercati & Economia',
+              'Geopolitica',
+              'Scienza',
+              'Aerospazio & Aviazione',
+              'Italia',
+              'Altro',
+            ],
           },
           source: { type: 'string', description: 'Nome della testata sorgente' },
           sourceUrl: { type: 'string', description: 'URL dell\'articolo originale' },
@@ -121,7 +129,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 Il tuo obiettivo è sintetizzare le 10 notizie più cruciali della giornata per un professionista in movimento (lettura mattutina in metropolitana, offline-first).
 
 Requisiti:
-- Seleziona esattamente 10 notizie bilanciando le categorie: Tech & AI, Mercati & Economia, Geopolitica, Scienza, Italia.
+- Seleziona esattamente 10 notizie bilanciando le categorie: Tech & AI, Mercati & Economia, Geopolitica, Scienza, Aerospazio & Aviazione, Italia.
 - Scrivi in italiano impeccabile, chiaro e autorevole.
 - Per ogni articolo fornisci:
   * id univoco: "article-1", "article-2", ...

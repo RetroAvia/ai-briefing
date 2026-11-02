@@ -55,19 +55,19 @@ export const SEED_BRIEFING: DailyBriefing = {
     },
     {
       id: 'art-3',
-      title: 'Vertice sul futuro dell\'infrastruttura aerospaziale: accordo tra 14 Paesi',
-      category: 'Geopolitica',
-      source: 'BBC World News',
-      sourceUrl: 'https://www.bbc.com/news',
+      title: 'Nuova generazione di aerei a idrogeno: conclusi con successo i test di volo in quota',
+      category: 'Aerospazio & Aviazione',
+      source: 'FlightGlobal & ESA',
+      sourceUrl: 'https://www.esa.int',
       readingTimeMinutes: 3,
-      impactScore: 89,
-      summary: 'Siglato a Ginevra il protocollo d\'intesa per la sicurezza delle comunicazioni orbitali e la condivisione tempestiva dei dati meteo-satellitari critici.',
+      impactScore: 96,
+      summary: 'Completata la prima campagna di collaudo del prototipo di velivolo commerciale a celle a combustibile a idrogeno liquido e ala a flusso laminare naturale ad alta efficienza aerodinamica.',
       keyPoints: [
-        'Rete di monitoraggio condivisa per prevenire interferenze e detriti spaziali',
-        'Standard aperto per le comunicazioni di emergenza civili',
-        'Creazione di un fondo di cooperazione per le nazioni emergenti',
+        'Zero emissioni dirette di CO2 e abbattimento dell\'80% del rumore acustico al decollo',
+        'Autonomia confermata di oltre 1.800 km a Mach 0.78 con pieno carico utile di passeggeri',
+        'Certificazione EASA prevista entro il 2028 per le prime rotte continentali a zero emissioni',
       ],
-      whyCounts: 'La cooperazione sulle infrastrutture satellitari garantisce la continuità delle reti di telecomunicazione critiche in caso di crisi geopolitiche terrestri.',
+      whyCounts: 'Rappresenta la svolta ingegneristica più attesa dell\'aviazione civile: prova la fattibilità della propulsione pulita criogenica senza sacrificare prestazioni di crociera.',
     },
     {
       id: 'art-4',
@@ -151,19 +151,19 @@ export const SEED_BRIEFING: DailyBriefing = {
     },
     {
       id: 'art-9',
-      title: 'Città intelligenti e mobilità dolce: finanziati 45 nuovi progetti metropolitani',
-      category: 'Italia',
-      source: 'ANSA',
-      sourceUrl: 'https://www.ansa.it',
-      readingTimeMinutes: 2,
-      impactScore: 85,
-      summary: 'Stanziati fondi per prolungamenti di linee metropolitane, corsie preferenziali protette e semaforizzazione intelligente per abbattere i tempi di pendolarismo.',
+      title: 'Lanciatori orbitali a recupero totale: successo storico per il test a combustione stadiata metano-LOX',
+      category: 'Aerospazio & Aviazione',
+      source: 'SpaceNews',
+      sourceUrl: 'https://spacenews.com',
+      readingTimeMinutes: 3,
+      impactScore: 94,
+      summary: 'Completato con atterraggio di precisione millimetrica il volo suborbitale del nuovo stadio propulsivo riutilizzabile, aprendo all\'accesso economico a orbite LEO e GEO.',
       keyPoints: [
-        'Priorità ai collegamenti periferia-centro nelle grandi aree urbane',
-        'Integrazione tariffaria unica via app per tutti i mezzi pubblici',
-        'Installazione di nuove pensiline intelligenti con monitoraggio in tempo reale',
+        'Propulsori a ciclo chiuso con efficienza di impulso specifico (Isp) record a livello del mare',
+        'Costo per chilogrammo in orbita ridotto del 70% rispetto ai vettori tradizionali sacrificabili',
+        'Accordo siglato con agenzie spaziali europee per il trasporto cargo verso moduli scientifici',
       ],
-      whyCounts: 'Migliora la qualità della vita quotidiana di milioni di lavoratori riducendo congestione e inquinamento atmosferico nelle città.',
+      whyCounts: 'La riutilizzabilità rapida dei razzi è la chiave della new space economy: rende sostenibili stazioni orbitali commerciali ed esplorazione profonda del sistema solare.',
     },
     {
       id: 'art-10',
@@ -196,48 +196,65 @@ function isIndexedDBSupported(): boolean {
   }
 }
 
-let dbPromise: Promise<IDBPDatabase> | null = null;
+let dbInstance: IDBPDatabase | null = null;
+let dbPromise: Promise<IDBPDatabase | null> | null = null;
 
 async function getDB(): Promise<IDBPDatabase | null> {
   if (!isIndexedDBSupported()) return null;
+  if (dbInstance) return dbInstance;
+  if (dbPromise) return dbPromise;
 
-  if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        try {
-          if (!db.objectStoreNames.contains(STORE_BRIEFINGS)) {
-            db.createObjectStore(STORE_BRIEFINGS, { keyPath: 'date' });
+  dbPromise = (async () => {
+    try {
+      // Timeout rigido di 800ms: su iOS Safari, se un upgrade IndexedDB è bloccato da un'altra scheda,
+      // openDB rimane appeso all'infinito. Il timeout garantisce che l'app NON si blocchi mai!
+      const openPromise = openDB(DB_NAME, DB_VERSION, {
+        upgrade(db) {
+          try {
+            if (!db.objectStoreNames.contains(STORE_BRIEFINGS)) {
+              db.createObjectStore(STORE_BRIEFINGS, { keyPath: 'date' });
+            }
+            if (!db.objectStoreNames.contains(STORE_BOOKMARKS)) {
+              db.createObjectStore(STORE_BOOKMARKS, { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains(STORE_PREFERENCES)) {
+              db.createObjectStore(STORE_PREFERENCES);
+            }
+          } catch (e) {
+            console.warn('[IDB] Errore upgrade schema:', e);
           }
-          if (!db.objectStoreNames.contains(STORE_BOOKMARKS)) {
-            db.createObjectStore(STORE_BOOKMARKS, { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains(STORE_PREFERENCES)) {
-            db.createObjectStore(STORE_PREFERENCES);
-          }
-        } catch (e) {
-          console.warn('[IDB] Errore in upgrade:', e);
-        }
-      },
-      blocked() {
-        console.warn('[IDB] Database bloccato da un\'altra scheda');
-      },
-      blocking() {
-        console.warn('[IDB] Chiusura vecchia connessione database');
-      },
-    }).catch((err) => {
-      console.warn('[IDB] Inizializzazione fallita (possibile modalità privata mobile):', err);
+        },
+        blocked() {
+          console.warn('[IDB] Upgrade bloccato su iOS');
+        },
+        blocking(currentVersion, blockedVersion, event) {
+          // Chiude la connessione vecchia per consentire l'upgrade su iOS Safari
+          try {
+            const target = event.target as unknown as { result?: IDBDatabase };
+            if (target && target.result && typeof target.result.close === 'function') {
+              target.result.close();
+            }
+          } catch {}
+        },
+      });
+
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 800));
+      const result = await Promise.race([openPromise, timeoutPromise]);
+
+      if (result) {
+        dbInstance = result;
+        return dbInstance;
+      }
+      return null;
+    } catch (err) {
+      console.warn('[IDB] Inizializzazione fallita, uso fallback memoria/localStorage:', err);
+      return null;
+    } finally {
       dbPromise = null;
-      return null as unknown as IDBPDatabase;
-    });
-  }
+    }
+  })();
 
-  try {
-    const db = await dbPromise;
-    return db || null;
-  } catch {
-    dbPromise = null;
-    return null;
-  }
+  return dbPromise;
 }
 
 // Salva o aggiorna un briefing giornaliero in IndexedDB con fallback localStorage
@@ -254,10 +271,12 @@ export async function saveBriefing(briefing: DailyBriefing): Promise<void> {
     if (db) {
       await db.put(STORE_BRIEFINGS, cached);
     } else {
-      // Fallback localStorage
+      // Fallback localStorage immediato per iPhone
       if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(`briefing_${briefing.date}`, JSON.stringify(cached));
-        window.localStorage.setItem('latest_briefing_date', briefing.date);
+        try {
+          window.localStorage.setItem(`briefing_${briefing.date}`, JSON.stringify(cached));
+          window.localStorage.setItem('latest_briefing_date', briefing.date);
+        } catch {}
       }
       memoryStore.set(`briefing_${briefing.date}`, cached);
     }
@@ -266,7 +285,7 @@ export async function saveBriefing(briefing: DailyBriefing): Promise<void> {
   }
 }
 
-// Recupera il briefing più recente salvato in locale
+// Recupera il briefing più recente salvato in locale (con garanzia di risposta istantanea)
 export async function getLatestBriefing(): Promise<DailyBriefing | null> {
   try {
     const db = await getDB();
@@ -280,16 +299,18 @@ export async function getLatestBriefing(): Promise<DailyBriefing | null> {
       }
     }
 
-    // Fallback localStorage per smartphone
+    // Fallback localStorage per iPhone
     if (typeof window !== 'undefined' && window.localStorage) {
-      const latestDate = window.localStorage.getItem('latest_briefing_date');
-      if (latestDate) {
-        const raw = window.localStorage.getItem(`briefing_${latestDate}`);
-        if (raw) {
-          const parsed = JSON.parse(raw) as CachedBriefing;
-          return parsed.briefing || null;
+      try {
+        const latestDate = window.localStorage.getItem('latest_briefing_date');
+        if (latestDate) {
+          const raw = window.localStorage.getItem(`briefing_${latestDate}`);
+          if (raw) {
+            const parsed = JSON.parse(raw) as CachedBriefing;
+            if (parsed && parsed.briefing) return parsed.briefing;
+          }
         }
-      }
+      } catch {}
     }
 
     return null;
@@ -310,11 +331,13 @@ export async function getBriefingByDate(date: string): Promise<DailyBriefing | n
     }
 
     if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem(`briefing_${date}`);
-      if (raw) {
-        const parsed = JSON.parse(raw) as CachedBriefing;
-        return parsed.briefing || null;
-      }
+      try {
+        const raw = window.localStorage.getItem(`briefing_${date}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as CachedBriefing;
+          return parsed.briefing || null;
+        }
+      } catch {}
     }
     return null;
   } catch {
@@ -333,12 +356,14 @@ export async function getAvailableBriefingDates(): Promise<string[]> {
 
     const dates: string[] = [];
     if (typeof window !== 'undefined' && window.localStorage) {
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const key = window.localStorage.key(i);
-        if (key && key.startsWith('briefing_')) {
-          dates.push(key.replace('briefing_', ''));
+      try {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith('briefing_')) {
+            dates.push(key.replace('briefing_', ''));
+          }
         }
-      }
+      } catch {}
     }
     return dates.sort((a, b) => b.localeCompare(a));
   } catch {
@@ -354,9 +379,11 @@ export async function saveBookmark(article: Article): Promise<void> {
     if (db) {
       await db.put(STORE_BOOKMARKS, { ...article, savedAt: Date.now() });
     } else if (typeof window !== 'undefined' && window.localStorage) {
-      const current = await getBookmarks();
-      const updated = [article, ...current.filter((b) => b.id !== article.id)];
-      window.localStorage.setItem('user_bookmarks', JSON.stringify(updated));
+      try {
+        const current = await getBookmarks();
+        const updated = [article, ...current.filter((b) => b.id !== article.id)];
+        window.localStorage.setItem('user_bookmarks', JSON.stringify(updated));
+      } catch {}
     }
   } catch (err) {
     console.warn('[IDB] Errore salvataggio bookmark:', err);
@@ -370,9 +397,11 @@ export async function removeBookmark(articleId: string): Promise<void> {
     if (db) {
       await db.delete(STORE_BOOKMARKS, articleId);
     } else if (typeof window !== 'undefined' && window.localStorage) {
-      const current = await getBookmarks();
-      const updated = current.filter((b) => b.id !== articleId);
-      window.localStorage.setItem('user_bookmarks', JSON.stringify(updated));
+      try {
+        const current = await getBookmarks();
+        const updated = current.filter((b) => b.id !== articleId);
+        window.localStorage.setItem('user_bookmarks', JSON.stringify(updated));
+      } catch {}
     }
   } catch (err) {
     console.warn('[IDB] Errore rimozione bookmark:', err);
@@ -391,8 +420,10 @@ export async function getBookmarks(): Promise<Article[]> {
     }
 
     if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem('user_bookmarks');
-      if (raw) return JSON.parse(raw);
+      try {
+        const raw = window.localStorage.getItem('user_bookmarks');
+        if (raw) return JSON.parse(raw);
+      } catch {}
     }
     return [];
   } catch (err) {
@@ -411,8 +442,10 @@ export async function getPreferences(): Promise<UserPreferences> {
     }
 
     if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem('user_preferences');
-      if (raw) return JSON.parse(raw);
+      try {
+        const raw = window.localStorage.getItem('user_preferences');
+        if (raw) return JSON.parse(raw);
+      } catch {}
     }
     return DEFAULT_PREFERENCES;
   } catch {
@@ -427,7 +460,9 @@ export async function savePreferences(prefs: UserPreferences): Promise<void> {
       await db.put(STORE_PREFERENCES, prefs, 'user_prefs');
     }
     if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem('user_preferences', JSON.stringify(prefs));
+      try {
+        window.localStorage.setItem('user_preferences', JSON.stringify(prefs));
+      } catch {}
     }
   } catch (err) {
     console.warn('[IDB] Errore salvataggio preferenze:', err);

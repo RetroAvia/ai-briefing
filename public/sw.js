@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE = `ai-briefing-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `ai-briefing-dynamic-${CACHE_VERSION}`;
 
@@ -86,31 +86,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigazione pagine (HTML): Network-first con fallback su cache o offline.html
+  // 2. Navigazione pagine (HTML): Network-first con fallback su cache o offline.html (compatibile Safari iOS)
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(DYNAMIC_CACHE).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(event.request);
-          if (cached) return cached;
-          const rootCached = await caches.match('/');
-          if (rootCached) return rootCached;
-          const fallback = await caches.match('/offline.html');
-          return (
-            fallback ||
-            new Response(
-              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline</title><style>body{background:#000;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;text-align:center;}button{background:#0071e3;color:#fff;border:none;padding:10px 20px;border-radius:20px;font-weight:bold;margin-top:15px;cursor:pointer;}</style></head><body><div><h2>Modalità Offline</h2><p>Impossibile stabilire una connessione di rete.</p><button onclick="location.reload()">Riprova</button></div></body></html>',
-              { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-            )
-          );
-        })
+      fetch(event.request).catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        const rootCached = await caches.match('/');
+        if (rootCached) return rootCached;
+        const fallback = await caches.match('/offline.html');
+        return (
+          fallback ||
+          new Response(
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline</title><style>body{background:#000;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;text-align:center;}button{background:#0071e3;color:#fff;border:none;padding:10px 20px;border-radius:20px;font-weight:bold;margin-top:15px;cursor:pointer;}</style></head><body><div><h2>Modalità Offline</h2><p>Impossibile stabilire una connessione di rete.</p><button onclick="location.reload()">Riprova</button></div></body></html>',
+            { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+          )
+        );
+      })
     );
     return;
   }

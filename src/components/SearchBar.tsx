@@ -67,9 +67,9 @@ export default function SearchBar({ value, onChange }: SearchBarProps) {
         placeholder="Cerca per tema, titolo, parola chiave o fonte..."
         className="w-full pl-11 pr-24 py-3 text-sm font-medium rounded-2xl text-white placeholder-[#86868b] outline-none transition-all duration-200 border shadow-sm"
         style={{
-          background: 'rgba(28, 28, 36, 0.72)',
-          backdropFilter: 'blur(30px) saturate(190%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(190%)',
+          background: 'rgba(28, 28, 36, 0.88)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           borderColor: 'rgba(255, 255, 255, 0.09)',
         }}
         onFocus={(e) => {

@@ -30,22 +30,22 @@ export default function HeroStory({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
-      className="relative mb-6 sm:mb-8 rounded-[28px] sm:rounded-[32px] overflow-hidden cursor-pointer group transition-all duration-300"
+      className="relative mb-6 sm:mb-8 rounded-[28px] sm:rounded-[32px] overflow-hidden cursor-pointer group transition-[border-color,box-shadow] duration-200"
       onClick={() => {
         triggerHaptic(15);
         onOpenArticle(article);
       }}
       style={{
-        background: 'linear-gradient(160deg, rgba(28, 28, 36, 0.78) 0%, rgba(14, 14, 18, 0.9) 100%)',
-        backdropFilter: 'blur(35px) saturate(190%)',
-        WebkitBackdropFilter: 'blur(35px) saturate(190%)',
+        background: 'linear-gradient(160deg, rgba(28, 28, 36, 0.9) 0%, rgba(14, 14, 18, 0.95) 100%)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid rgba(255, 255, 255, 0.11)',
         boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
       }}
     >
       {/* Apple Ambient Glow with category accent */}
       <div
-        className="absolute -top-32 -right-32 w-80 h-80 rounded-full opacity-20 pointer-events-none blur-3xl transition-opacity duration-500 group-hover:opacity-30"
+        className="absolute -top-32 -right-32 w-80 h-80 rounded-full opacity-20 pointer-events-none transition-opacity duration-500 group-hover:opacity-30"
         style={{ background: `radial-gradient(circle, ${config.accentHex}, transparent 70%)` }}
       />
 

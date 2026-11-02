@@ -76,6 +76,17 @@ const RSS_FEEDS: FeedConfig[] = [
     source: 'ANSA Scienza',
     categoryHint: 'Scienza',
   },
+  // Aerospazio & Aviazione
+  {
+    url: 'https://spacenews.com/feed/',
+    source: 'SpaceNews',
+    categoryHint: 'Aerospazio & Aviazione',
+  },
+  {
+    url: 'https://www.esa.int/rssfeed/Our_Activities/Space_News',
+    source: 'ESA Space News',
+    categoryHint: 'Aerospazio & Aviazione',
+  },
 ];
 
 // Fallback di riserva se tutti i feed remoti sono temporaneamente bloccati o irraggiungibili
@@ -105,12 +116,20 @@ const FALLBACK_ARTICLES: RawArticle[] = [
     categoryHint: 'Geopolitica',
   },
   {
-    title: 'Missioni spaziali e osservazione planetaria: completati i test sul telescopio di nuova generazione',
-    link: 'https://www.ansa.it',
-    contentSnippet: 'La comunità scientifica festeggia l\'acquisizione delle prime immagini a infrarosso profondo dai confini del sistema solare.',
-    source: 'Scienza Globale',
+    title: 'Missioni spaziali e osservazione orbitale: completati i test sul telescopio e sul lanciatore di nuova generazione',
+    link: 'https://spacenews.com',
+    contentSnippet: 'La comunità scientifica festeggia l\'acquisizione delle prime immagini a infrarosso profondo dai confini del sistema solare e il collaudo del vettore riutilizzabile.',
+    source: 'SpaceNews',
     pubDate: new Date().toISOString(),
-    categoryHint: 'Scienza',
+    categoryHint: 'Aerospazio & Aviazione',
+  },
+  {
+    title: 'Aviazione civile supersonica: al via i collaudi per velivoli a impatto sonico ridotto e carburanti SAF',
+    link: 'https://www.esa.int',
+    contentSnippet: 'Presentata la nuova configurazione alare per voli commerciali transatlantici a Mach 1.5 a basse emissioni con carburanti sintetici.',
+    source: 'AeroTech Review',
+    pubDate: new Date().toISOString(),
+    categoryHint: 'Aerospazio & Aviazione',
   },
   {
     title: 'Piano strategico per le competenze digitali e il supporto all\'innovazione nel Paese',

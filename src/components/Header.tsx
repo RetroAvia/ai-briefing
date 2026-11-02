@@ -62,9 +62,9 @@ export default function Header({
       <div
         className="px-4 py-3 sm:px-6 lg:px-8 border-b"
         style={{
-          background: 'rgba(10, 10, 14, 0.82)',
-          backdropFilter: 'blur(30px) saturate(190%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(190%)',
+          background: 'rgba(10, 10, 14, 0.88)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           borderColor: 'rgba(255, 255, 255, 0.08)',
         }}
       >

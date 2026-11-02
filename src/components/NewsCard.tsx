@@ -78,10 +78,11 @@ export default function NewsCard({
           triggerHaptic(10);
           onOpenArticle?.(article);
         }}
-        className="p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 group shadow-sm hover:scale-[1.008]"
+        className="p-3.5 sm:p-4 rounded-2xl border transition-[border-color,background-color] duration-200 cursor-pointer flex items-center justify-between gap-3 group shadow-sm hover:scale-[1.008]"
         style={{
-          background: 'rgba(20, 20, 28, 0.7)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(20, 20, 28, 0.88)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           borderColor: 'rgba(255, 255, 255, 0.08)',
         }}
       >
@@ -137,10 +138,11 @@ export default function NewsCard({
           triggerHaptic(10);
           onOpenArticle?.(article);
         }}
-        className="p-4 sm:p-5 rounded-[22px] border transition-all cursor-pointer flex flex-col justify-between gap-3 group h-full shadow-sm hover:scale-[1.01]"
+        className="p-4 sm:p-5 rounded-[22px] border transition-[border-color,background-color,box-shadow] duration-200 cursor-pointer flex flex-col justify-between gap-3 group h-full shadow-sm hover:scale-[1.01]"
         style={{
-          background: 'rgba(20, 20, 28, 0.7)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(20, 20, 28, 0.88)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           borderColor: 'rgba(255, 255, 255, 0.08)',
         }}
       >
@@ -197,17 +199,16 @@ export default function NewsCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: [0.32, 0.72, 0, 1] }}
-      layout
-      className="relative group rounded-[26px] overflow-hidden cursor-pointer transition-all duration-300 border hover:scale-[1.008] flex flex-col justify-between h-full"
+      className="relative group rounded-[26px] overflow-hidden cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 border hover:scale-[1.008] flex flex-col justify-between h-full"
       onClick={() => {
         triggerHaptic(10);
         onOpenArticle?.(article);
       }}
       style={{
-        background: 'rgba(20, 20, 28, 0.72)',
+        background: 'rgba(20, 20, 28, 0.88)',
         borderColor: 'rgba(255, 255, 255, 0.08)',
-        backdropFilter: 'blur(30px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
         boxShadow: '0 12px 35px -10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
       }}
     >

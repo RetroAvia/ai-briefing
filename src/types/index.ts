@@ -17,6 +17,7 @@ export type Category =
   | 'Mercati & Economia'
   | 'Geopolitica'
   | 'Scienza'
+  | 'Aerospazio & Aviazione'
   | 'Italia'
   | 'Altro';
 
@@ -25,6 +26,7 @@ export const ALL_CATEGORIES: Category[] = [
   'Mercati & Economia',
   'Geopolitica',
   'Scienza',
+  'Aerospazio & Aviazione',
   'Italia',
   'Altro',
 ];
@@ -108,6 +110,14 @@ export const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
     borderColor: 'border-[#bf5af2]/30',
     accentHex: '#bf5af2',
     badgeGlow: 'rgba(191, 90, 242, 0.3)',
+  },
+  'Aerospazio & Aviazione': {
+    label: 'Aerospazio & Aviazione',
+    color: 'text-[#64d2ff]',
+    bgColor: 'bg-[#64d2ff]/10',
+    borderColor: 'border-[#64d2ff]/30',
+    accentHex: '#64d2ff',
+    badgeGlow: 'rgba(100, 210, 255, 0.35)',
   },
   'Italia': {
     label: 'Italia',

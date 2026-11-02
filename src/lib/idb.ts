@@ -1,16 +1,25 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import type { CachedBriefing, DailyBriefing, Article } from '@/types';
+import type { CachedBriefing, DailyBriefing, Article, UserPreferences } from '@/types';
 
 const DB_NAME = 'ai-briefing-db';
-const DB_VERSION = 2; // Aggiornato per includere lo store dei segnalibri (bookmarks)
+const DB_VERSION = 3; // Aggiornato per preferenze utente e archivio storico
 const STORE_BRIEFINGS = 'briefings';
 const STORE_BOOKMARKS = 'bookmarks';
+const STORE_PREFERENCES = 'preferences';
 
-// Briefing dimostrativo iniziale di alta qualità (pronto all'uso per il primo avvio o visualizzazione offline)
+export const DEFAULT_PREFERENCES: UserPreferences = {
+  density: 'magazine',
+  theme: 'midnight',
+  fontSize: 'normal',
+  autoPlayAudio: false,
+};
+
+// Briefing dimostrativo iniziale di altissima caratura editoriale
 export const SEED_BRIEFING: DailyBriefing = {
   id: 'seed-briefing-001',
   date: new Date().toISOString().split('T')[0]!,
   created_at: new Date().toISOString(),
+  curatorNotes: 'Il briefing odierno evidenzia una forte accelerazione sull\'autonomia algoritmica edge e stabilità dei mercati tecnologici continentali.',
   articles: [
     {
       id: 'art-1',
@@ -19,6 +28,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'ANSA Tech',
       sourceUrl: 'https://www.ansa.it/canale_tecnologia',
       readingTimeMinutes: 2,
+      impactScore: 98,
       summary: 'I nuovi processori integrano accelerator neurale dedicato con efficienza quadruplicata, consentendo l\'esecuzione di LLM complessi interamente in locale senza connessione cloud.',
       keyPoints: [
         'Consumo energetico ridotto del 55% a parità di throughput matematico',
@@ -34,6 +44,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'Il Sole 24 Ore',
       sourceUrl: 'https://www.ilsole24ore.com/finanza',
       readingTimeMinutes: 3,
+      impactScore: 92,
       summary: 'Gli indici continentali chiudono in territorio positivo grazie alla spinta delle utility e dell\'industria dei semiconduttori, con afflussi record sui fondi sostenibili.',
       keyPoints: [
         'Spread in contrazione e rendimenti obbligazionari stabili sui mercati sovrani',
@@ -49,6 +60,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'BBC World News',
       sourceUrl: 'https://www.bbc.com/news',
       readingTimeMinutes: 3,
+      impactScore: 89,
       summary: 'Siglato a Ginevra il protocollo d\'intesa per la sicurezza delle comunicazioni orbitali e la condivisione tempestiva dei dati meteo-satellitari critici.',
       keyPoints: [
         'Rete di monitoraggio condivisa per prevenire interferenze e detriti spaziali',
@@ -64,6 +76,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'ANSA Scienza',
       sourceUrl: 'https://www.ansa.it/canale_scienza_tecnica',
       readingTimeMinutes: 4,
+      impactScore: 95,
       summary: 'I fisici dell\'esperimento congiunto sono riusciti a mantenere stabile per oltre 12 minuti una colonna di plasma a 100 milioni di gradi centigradi.',
       keyPoints: [
         'Materiali in carburo di silicio avanzato impiegati con successo per le pareti',
@@ -79,6 +92,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'Il Sole 24 Ore',
       sourceUrl: 'https://www.ilsole24ore.com',
       readingTimeMinutes: 2,
+      impactScore: 88,
       summary: 'Inaugurato il nuovo data center federato che ospiterà i servizi strategici della pubblica amministrazione e delle filiere manifatturiere d\'eccellenza.',
       keyPoints: [
         'Infrastruttura alimentata al 100% da fonti rinnovabili geotermiche e solari',
@@ -94,6 +108,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'TechCrunch',
       sourceUrl: 'https://techcrunch.com',
       readingTimeMinutes: 3,
+      impactScore: 94,
       summary: 'La transizione dai semplici chatbot di testo a swarm di agenti intelligenti capaci di pianificare, testare ed eseguire flussi software complessi in autonomia.',
       keyPoints: [
         'Integrazione profonda con repository di codice, database e pipeline CI/CD',
@@ -109,6 +124,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'Corriere Economia',
       sourceUrl: 'https://www.corriere.it/economia',
       readingTimeMinutes: 2,
+      impactScore: 87,
       summary: 'L\'export manifatturiero e dei macchinari di precisione segna un incremento dell\'8,4%, confermando la solidità delle filiere specializzate nel Nord e Centro Italia.',
       keyPoints: [
         'Robotica industriale e automazione guidano la domanda dai mercati esteri',
@@ -124,6 +140,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'ANSA Scienza',
       sourceUrl: 'https://www.ansa.it/canale_scienza_tecnica',
       readingTimeMinutes: 3,
+      impactScore: 91,
       summary: 'Approvato il primo trattamento CRISPR di seconda generazione capace di correggere con precisione millimetrica le mutazioni responsabili di patologie rare del sangue.',
       keyPoints: [
         'Efficacia clinica dimostrata superiore al 92% nei trial di fase III',
@@ -139,6 +156,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'ANSA',
       sourceUrl: 'https://www.ansa.it',
       readingTimeMinutes: 2,
+      impactScore: 85,
       summary: 'Stanziati fondi per prolungamenti di linee metropolitane, corsie preferenziali protette e semaforizzazione intelligente per abbattere i tempi di pendolarismo.',
       keyPoints: [
         'Priorità ai collegamenti periferia-centro nelle grandi aree urbane',
@@ -154,6 +172,7 @@ export const SEED_BRIEFING: DailyBriefing = {
       source: 'The Verge',
       sourceUrl: 'https://www.theverge.com',
       readingTimeMinutes: 3,
+      impactScore: 93,
       summary: 'I consorzi internazionali di standardizzazione rilasciano gli algoritmi definitivi per proteggere le comunicazioni crittografate prima dell\'avvento dei computer quantistici.',
       keyPoints: [
         'Quattro nuovi standard crittografici basati su reticoli matematici multidimensionali',
@@ -176,6 +195,9 @@ function getDB(): Promise<IDBPDatabase> {
         }
         if (!db.objectStoreNames.contains(STORE_BOOKMARKS)) {
           db.createObjectStore(STORE_BOOKMARKS, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_PREFERENCES)) {
+          db.createObjectStore(STORE_PREFERENCES);
         }
       },
     });
@@ -215,6 +237,28 @@ export async function getLatestBriefing(): Promise<DailyBriefing | null> {
   }
 }
 
+// Recupera briefing per data specifica (Archivio Storico)
+export async function getBriefingByDate(date: string): Promise<DailyBriefing | null> {
+  try {
+    const db = await getDB();
+    const cached = (await db.get(STORE_BRIEFINGS, date)) as CachedBriefing | undefined;
+    return cached?.briefing ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Restituisce tutte le date disponibili nei briefing memorizzati
+export async function getAvailableBriefingDates(): Promise<string[]> {
+  try {
+    const db = await getDB();
+    const all = await db.getAllKeys(STORE_BRIEFINGS);
+    return (all as string[]).sort((a, b) => b.localeCompare(a));
+  } catch {
+    return [];
+  }
+}
+
 // Segnalibri (Bookmarks) salvati localmente per lettura offline
 export async function saveBookmark(article: Article): Promise<void> {
   try {
@@ -238,19 +282,32 @@ export async function getBookmarks(): Promise<Article[]> {
   try {
     const db = await getDB();
     const all = await db.getAll(STORE_BOOKMARKS);
-    return (all as Article[]).sort((a, b) => ((b as { savedAt?: number }).savedAt || 0) - ((a as { savedAt?: number }).savedAt || 0));
+    return (all as Article[]).sort(
+      (a, b) =>
+        ((b as { savedAt?: number }).savedAt || 0) - ((a as { savedAt?: number }).savedAt || 0)
+    );
   } catch (err) {
     console.warn('[IDB] Errore recupero bookmarks:', err);
     return [];
   }
 }
 
-export async function isArticleBookmarked(articleId: string): Promise<boolean> {
+// Preferenze Utente (Densità, Tema, Font Size)
+export async function getPreferences(): Promise<UserPreferences> {
   try {
     const db = await getDB();
-    const item = await db.get(STORE_BOOKMARKS, articleId);
-    return item !== undefined;
+    const prefs = (await db.get(STORE_PREFERENCES, 'user_prefs')) as UserPreferences | undefined;
+    return prefs || DEFAULT_PREFERENCES;
   } catch {
-    return false;
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+export async function savePreferences(prefs: UserPreferences): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.put(STORE_PREFERENCES, prefs, 'user_prefs');
+  } catch (err) {
+    console.warn('[IDB] Errore salvataggio preferenze:', err);
   }
 }

@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExternalLink, Share2, Clock, ChevronDown, ChevronUp, Bookmark, Volume2, Check } from 'lucide-react';
 import { useState } from 'react';
-import type { Article } from '@/types';
+import type { Article, DisplayDensity } from '@/types';
 import { CATEGORY_CONFIG } from '@/types';
 import { triggerHaptic } from '@/lib/export';
 
@@ -11,22 +11,24 @@ interface NewsCardProps {
   article: Article;
   index: number;
   isOnline: boolean;
+  density?: DisplayDensity;
   isBookmarked?: boolean;
   onToggleBookmark?: (article: Article) => void;
   onPlaySingleArticle?: (article: Article) => void;
   onShowToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
-  onOpenStoriesAtIndex?: (index: number) => void;
+  onOpenArticle?: (article: Article) => void;
 }
 
 export default function NewsCard({
   article,
   index,
   isOnline,
+  density = 'magazine',
   isBookmarked = false,
   onToggleBookmark,
   onPlaySingleArticle,
   onShowToast,
-  onOpenStoriesAtIndex,
+  onOpenArticle,
 }: NewsCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -44,9 +46,7 @@ export default function NewsCard({
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share(shareData);
-      } catch {
-        // User cancel
-      }
+      } catch {}
     } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
       await navigator.clipboard.writeText(`${article.title}\n${article.sourceUrl}`);
       setCopied(true);
@@ -67,61 +67,96 @@ export default function NewsCard({
     onPlaySingleArticle?.(article);
   }
 
+  // MODALITÀ COMPATTA (Per scorrimento ultra-rapido in metro)
+  if (density === 'compact') {
+    return (
+      <motion.article
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.25) }}
+        onClick={() => {
+          triggerHaptic(10);
+          onOpenArticle?.(article);
+        }}
+        className="p-3 sm:p-4 rounded-2xl border bg-[#11131c]/90 hover:bg-[#141724] border-white/5 hover:border-violet-500/30 transition-all cursor-pointer flex items-center justify-between gap-3 group shadow-md"
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <span
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              article.category === 'Tech & AI'
+                ? 'bg-cyan-400'
+                : article.category === 'Mercati & Economia'
+                ? 'bg-emerald-400'
+                : article.category === 'Scienza'
+                ? 'bg-violet-400'
+                : 'bg-amber-400'
+            }`}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {article.source}
+              </span>
+              <span className="text-[10px] text-slate-600">•</span>
+              <span className="text-[10px] text-slate-400">{article.readingTimeMinutes} min</span>
+            </div>
+            <h3 className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-cyan-200 transition-colors">
+              {article.title}
+            </h3>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={handlePlayClick}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 transition-colors"
+            title="Ascolta"
+          >
+            <Volume2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleBookmarkClick}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isBookmarked ? 'text-amber-400' : 'text-slate-500 hover:text-white'
+            }`}
+            title="Bookmark"
+          >
+            <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-amber-400' : ''}`} />
+          </button>
+        </div>
+      </motion.article>
+    );
+  }
+
+  // MODALITÀ RIVISTA (MAGAZINE) / MINIMALE
   return (
     <motion.article
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: 'easeOut' }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
       layout
-      className="relative group rounded-3xl overflow-hidden cursor-pointer transition-all duration-300"
+      className="relative group rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 border"
       onClick={() => {
         triggerHaptic(10);
-        setExpanded((e) => !e);
+        onOpenArticle?.(article);
       }}
       style={{
-        background: 'rgba(17, 19, 28, 0.88)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'rgba(17, 19, 28, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         boxShadow: '0 8px 30px -10px rgba(0, 0, 0, 0.5)',
       }}
     >
-      {/* Glow e bordo reattivo all'hover con gradiente della categoria */}
-      <div
-        className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-        style={{
-          background:
-            article.category === 'Tech & AI'
-              ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(124, 58, 237, 0.05) 100%)'
-              : article.category === 'Mercati & Economia'
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.05) 100%)'
-              : article.category === 'Scienza'
-              ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(124, 58, 237, 0.05) 100%)'
-              : 'linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(6, 182, 212, 0.05) 100%)',
-          border: '1px solid rgba(124, 58, 237, 0.35)',
-        }}
-      />
-
-      {/* Linea superiore con gradiente neon perimetrale */}
+      {/* Specular border glow line */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px]"
         style={{
-          background:
-            article.category === 'Tech & AI'
-              ? 'linear-gradient(90deg, transparent, #06b6d4, transparent)'
-              : article.category === 'Mercati & Economia'
-              ? 'linear-gradient(90deg, transparent, #10b981, transparent)'
-              : article.category === 'Geopolitica'
-              ? 'linear-gradient(90deg, transparent, #f87171, transparent)'
-              : article.category === 'Scienza'
-              ? 'linear-gradient(90deg, transparent, #a78bfa, transparent)'
-              : article.category === 'Italia'
-              ? 'linear-gradient(90deg, transparent, #34d399, transparent)'
-              : 'linear-gradient(90deg, transparent, #94a3b8, transparent)',
+          background: `linear-gradient(90deg, transparent 0%, ${config.accentHex} 50%, transparent 100%)`,
         }}
       />
 
-      <div className="relative p-4 sm:p-6">
+      <div className="relative p-5 sm:p-6">
         {/* Header row: Categoria, Fonte, Tempo di lettura, Bookmark */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -163,9 +198,9 @@ export default function NewsCard({
           {article.title}
         </h2>
 
-        {/* Sommario Sintetico */}
-        {article.summary && (
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 line-clamp-2 sm:line-clamp-none font-normal">
+        {/* Sommario Sintetico (in modalità magazine) */}
+        {density === 'magazine' && article.summary && (
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 font-normal">
             {article.summary}
           </p>
         )}
@@ -187,7 +222,7 @@ export default function NewsCard({
           ))}
         </div>
 
-        {/* Expand / Collapse Button */}
+        {/* Expand / Collapse Button per Takeaway rapido */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <button
             className="flex items-center gap-1.5 text-xs font-bold text-violet-400 hover:text-violet-300 transition-colors"
@@ -198,21 +233,8 @@ export default function NewsCard({
             }}
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            <span>{expanded ? 'Chiudi approfondimento' : '✦ Perché conta (Takeaway strategico)'}</span>
+            <span>{expanded ? 'Chiudi takeaway' : '✦ Perché conta (Takeaway strategico)'}</span>
           </button>
-
-          {onOpenStoriesAtIndex && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerHaptic(15);
-                onOpenStoriesAtIndex(index);
-              }}
-              className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold transition-colors flex items-center gap-1"
-            >
-              <span>Focus Fullscreen</span>
-            </button>
-          )}
         </div>
 
         {/* Box Perché Conta (Espandibile) */}
@@ -255,7 +277,7 @@ export default function NewsCard({
               whileTap={{ scale: 0.95 }}
               onClick={handlePlayClick}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all duration-200"
-              title="Ascolta questa notizia (sintesi vocale)"
+              title="Ascolta questa notizia"
             >
               <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
               <span>Ascolta</span>
@@ -274,7 +296,7 @@ export default function NewsCard({
             </motion.button>
           </div>
 
-          {/* Fonte originale (Attiva solo se online) */}
+          {/* Fonte originale */}
           <motion.a
             href={article.sourceUrl}
             target="_blank"

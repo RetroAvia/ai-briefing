@@ -12,6 +12,45 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: 'midnight',
   fontSize: 'normal',
   autoPlayAudio: false,
+  hasCompletedOnboarding: false,
+  userRole: 'Ingegnere Aerospaziale',
+  categoryPreferences: {
+    'Aerospazio & Aviazione': {
+      interest: 'top',
+      pushAlerts: true,
+      favoriteSubtopics: ['Aerei a Idrogeno & SAF', 'Lanciatori Starship & Falcon', 'Missioni Lunari Artemis'],
+    },
+    'Tech & AI': {
+      interest: 'high',
+      pushAlerts: true,
+      favoriteSubtopics: ['Modelli LLM & Reasoning', 'Acceleratori Neurali a 2nm'],
+    },
+    'Cybersecurity': {
+      interest: 'high',
+      pushAlerts: false,
+      favoriteSubtopics: ['Crittografia Post-Quantistica', 'Difesa Reti Satellitari'],
+    },
+    'Energia & Sostenibilità': {
+      interest: 'high',
+      pushAlerts: false,
+      favoriteSubtopics: ['Fusione Nucleare Magnetica', 'Batterie a Stato Solido'],
+    },
+    'Scienza': {
+      interest: 'medium',
+    },
+    'Mercati & Economia': {
+      interest: 'medium',
+    },
+    'Geopolitica': {
+      interest: 'medium',
+    },
+    'Italia': {
+      interest: 'medium',
+    },
+    'Altro': {
+      interest: 'low',
+    },
+  },
 };
 
 // Briefing dimostrativo iniziale di altissima caratura editoriale
@@ -168,7 +207,7 @@ export const SEED_BRIEFING: DailyBriefing = {
     {
       id: 'art-10',
       title: 'Cybersecurity: direttiva globale per la crittografia post-quantistica',
-      category: 'Tech & AI',
+      category: 'Cybersecurity',
       source: 'The Verge',
       sourceUrl: 'https://www.theverge.com',
       readingTimeMinutes: 3,
@@ -180,6 +219,38 @@ export const SEED_BRIEFING: DailyBriefing = {
         'Nessun calo percettibile delle prestazioni sui moderni smartphone e browser',
       ],
       whyCounts: 'Previene il fenomeno dell\'intercettazione oggi per decifrare domani, blindando la sicurezza dei dati sensibili per i prossimi decenni.',
+    },
+    {
+      id: 'art-11',
+      title: 'Batterie a stato solido con elettrolita ceramico: triplicata l\'autonomia e ricarica in 8 minuti',
+      category: 'Energia & Sostenibilità',
+      source: 'ANSA Scienza & Tech',
+      sourceUrl: 'https://www.ansa.it/canale_tecnologia',
+      readingTimeMinutes: 2,
+      impactScore: 94,
+      summary: 'I laboratori europei completano i test di ciclo vitale sulla nuova cella litio-metallo con densità energetica gravimetrica superiore a 500 Wh/kg senza rischio di incendio.',
+      keyPoints: [
+        'Degrado inferiore al 5% dopo oltre 1.500 cicli completi di carica e scarica rapida',
+        'Integrazione prevista su aerei ibridi a corto raggio e veicoli pesanti da trasporto',
+        'Eliminazione totale del cobalto e uso ridotto di materie prime rare',
+      ],
+      whyCounts: 'Sblocca l\'elettrificazione del trasporto pesante e dell\'aviazione regionale, rendendo obsoleti i combustibili fossili per le medie distanze.',
+    },
+    {
+      id: 'art-12',
+      title: 'Scudo satellitare europeo: operativa la costellazione IRIS² per comunicazioni governative sicure',
+      category: 'Cybersecurity',
+      source: 'BBC World News',
+      sourceUrl: 'https://www.bbc.com',
+      readingTimeMinutes: 3,
+      impactScore: 95,
+      summary: 'L\'Unione Europea lancia i primi nodi orbitali per la rete crittografata quantistica indipendente che proteggerà comandi militari, diplomazia e reti energetiche.',
+      keyPoints: [
+        'Distribuzione quantistica delle chiavi (QKD) direttamente dallo spazio senza intercettabilità fisica',
+        'Copertura continua del continente europeo, bacino del Mediterraneo e rotte artiche',
+        'Piena interoperabilità con le stazioni di terra e le industrie aerospaziali europee',
+      ],
+      whyCounts: 'Fornisce sovranità digitale totale all\'Europa, garantendo comunicazioni invulnerabili anche in scenari di black-out o guerra elettronica.',
     },
   ],
 };

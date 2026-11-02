@@ -18,6 +18,10 @@ import StoryModeModal from '@/components/StoryModeModal';
 import KnowledgeGraphModal from '@/components/KnowledgeGraphModal';
 import ExportModal from '@/components/ExportModal';
 import FloatingAudioBar from '@/components/FloatingAudioBar';
+import WelcomePreferencesModal from '@/components/WelcomePreferencesModal';
+import GenerationModal from '@/components/GenerationModal';
+import ScenarioSimulatorModal from '@/components/ScenarioSimulatorModal';
+import KeyboardShortcutsModal from '@/components/KeyboardShortcutsModal';
 import ToastContainer, { type ToastMessage } from '@/components/Toast';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -31,6 +35,7 @@ import {
   removeBookmark,
   getPreferences,
   savePreferences,
+  DEFAULT_PREFERENCES,
 } from '@/lib/idb';
 import {
   getNotificationStatus,
@@ -39,8 +44,66 @@ import {
   unsubscribeFromNotifications,
 } from '@/lib/push';
 import { triggerHaptic } from '@/lib/export';
-import type { Article, DailyBriefing, DisplayDensity } from '@/types';
+import { playSoftClick, playCyberChime, playRadarScan } from '@/lib/sound';
+import type {
+  Article,
+  DailyBriefing,
+  DisplayDensity,
+  Category,
+  InterestLevel,
+  CategoryPreference,
+  UserPreferences,
+} from '@/types';
 import { ALL_CATEGORIES } from '@/types';
+
+// Algoritmo di ranking basato sul profilo preferenze dell'utente
+function sortArticlesByPreferences(
+  articles: Article[],
+  categoryPreferences?: Partial<Record<Category, CategoryPreference>>
+): Article[] {
+  if (!categoryPreferences || Object.keys(categoryPreferences).length === 0) {
+    return articles;
+  }
+
+  const weightMap: Record<InterestLevel, number> = {
+    top: 1000,
+    high: 500,
+    medium: 100,
+    low: 10,
+  };
+
+  return [...articles].sort((a, b) => {
+    const prefA = categoryPreferences[a.category];
+    const prefB = categoryPreferences[b.category];
+
+    const weightA = prefA?.interest ? weightMap[prefA.interest] : 100;
+    const weightB = prefB?.interest ? weightMap[prefB.interest] : 100;
+
+    const subtopicsA = prefA?.favoriteSubtopics || [];
+    const subtopicsB = prefB?.favoriteSubtopics || [];
+
+    const subBonusA = subtopicsA.some(
+      (s) =>
+        a.title.toLowerCase().includes(s.toLowerCase()) ||
+        a.summary.toLowerCase().includes(s.toLowerCase())
+    )
+      ? 60
+      : 0;
+
+    const subBonusB = subtopicsB.some(
+      (s) =>
+        b.title.toLowerCase().includes(s.toLowerCase()) ||
+        b.summary.toLowerCase().includes(s.toLowerCase())
+    )
+      ? 60
+      : 0;
+
+    const totalScoreA = weightA + subBonusA + (a.impactScore || 50) * 0.1;
+    const totalScoreB = weightB + subBonusB + (b.impactScore || 50) * 0.1;
+
+    return totalScoreB - totalScoreA;
+  });
+}
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -81,7 +144,19 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [source, setSource] = useState<'remote' | 'cache' | 'seed' | null>(null);
 
-  // Preferenze utente & Layout
+  // Preferenze utente, Profilo Radar & Forum di Benvenuto
+  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+
+  // Generatore On-Demand Notizie AI
+  const [isGeneratingOpen, setIsGeneratingOpen] = useState(false);
+
+  // Vision 3000: Simulatore Scenari Futuri 2030-2050 & Scorciatoie da Tastiera
+  const [isScenarioOpen, setIsScenarioOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+
+  // Layout & Densità visiva
   const [density, setDensity] = useState<DisplayDensity>('magazine');
 
   // Drawer lettura immersiva
@@ -148,10 +223,12 @@ export default function Home() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
+      playRadarScan();
       addToast('Connessione ripristinata: modalità Online attiva', 'success');
     };
     const handleOffline = () => {
       setIsOnline(false);
+      playSoftClick(400);
       addToast('Dispositivo offline: modalità metropolitana attiva', 'info');
     };
 
@@ -167,7 +244,12 @@ export default function Home() {
   // --- 3. Caricamento Preferenze Utente & Notifiche ---
   useEffect(() => {
     getPreferences().then((prefs) => {
+      setPreferences(prefs);
       setDensity(prefs.density || 'magazine');
+      if (prefs.hasCompletedOnboarding === false) {
+        setIsOnboarding(true);
+        setIsPreferencesOpen(true);
+      }
     });
 
     getNotificationStatus().then(({ subscribed }) => {
@@ -184,98 +266,126 @@ export default function Home() {
     getBookmarks().then((saved) => setBookmarks(saved));
   }, []);
 
-  // --- 5. Stale-While-Revalidate Offline-First Loader ---
+  // --- 5. Algoritmo di Caricamento Briefing Multi-Tier Robusto ---
   const loadBriefing = useCallback(
-    async (forceRemote = false, specificDate?: string) => {
+    async (forceRemote = false) => {
+      setIsLoading(true);
       if (forceRemote) setIsRefreshing(true);
 
-      // FASE 1: Idratazione ISTANTANEA da IndexedDB / Seed (0ms latenza offline)
-      try {
-        let cached: DailyBriefing | null = null;
-        if (specificDate) {
-          cached = await getBriefingByDate(specificDate);
-        } else {
-          cached = await getLatestBriefing();
-        }
+      const todayStr = new Date().toISOString().split('T')[0];
 
-        if (cached && cached.articles && cached.articles.length > 0) {
-          setBriefing(cached);
-          setSource('cache');
-        } else if (!briefing && !specificDate) {
-          // Primo avvio in assoluto: pre-carica con seed dimostrativo
-          setBriefing(SEED_BRIEFING);
-          setSource('seed');
-          await saveBriefing(SEED_BRIEFING).catch(() => {});
+      // TIER 1: IndexedDB Cache Locale (Zero latenza)
+      if (!forceRemote) {
+        try {
+          const cached = await getLatestBriefing();
+          if (cached && Array.isArray(cached.articles) && cached.articles.length > 0) {
+            setBriefing(cached);
+            setSource('cache');
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.warn('[IDB] Errore lettura cache:', err);
         }
-      } catch (err) {
-        console.warn('[IDB] Errore lettura cache:', err);
-      } finally {
-        // Mostra immediatamente l'interfaccia dopo la lettura locale (entro 50ms)
-        setIsLoading(false);
       }
 
-      // FASE 2: Revalidazione remota in background con timeout rigido (2000ms)
-      // Impedisce il freeze di iOS WebKit su connessioni instabili o host irraggiungibili
-      if ((navigator.onLine || forceRemote) && !specificDate) {
+      // TIER 2: Supabase Cloud Database (Se online)
+      if (navigator.onLine) {
         try {
           const supabase = createClient();
-          const supabaseQueryPromise = supabase
+          const { data, error } = await supabase
             .from('daily_briefings')
             .select('*')
             .order('date', { ascending: false })
             .limit(1)
-            .maybeSingle();
+            .single();
 
-          const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
-            setTimeout(() => resolve({ data: null, error: { message: 'Timeout sincronizzazione remota' } }), 2000)
-          );
+          if (!error && data) {
+            const row = data as unknown as { id: string; date: string; articles: Article[]; created_at: string };
+            if (Array.isArray(row.articles) && row.articles.length > 0) {
+              const remoteBriefing: DailyBriefing = {
+                id: row.id,
+                date: row.date,
+                articles: row.articles,
+                created_at: row.created_at,
+              };
 
-          const { data, error } = await Promise.race([supabaseQueryPromise, timeoutPromise]);
+              setBriefing(remoteBriefing);
+              setSource('remote');
+              await saveBriefing(remoteBriefing);
 
-          const remoteRow = data as unknown as DailyBriefing | null;
-          if (!error && remoteRow && Array.isArray(remoteRow.articles)) {
-            setBriefing(remoteRow);
-            setSource('remote');
-            await saveBriefing(remoteRow).catch(() => {});
-            getAvailableBriefingDates().then((dates) => setAvailableDates(dates));
-            if (forceRemote) {
-              addToast('Briefing aggiornato con le ultime notizie!', 'success');
+              if (forceRemote) {
+                playCyberChime();
+                addToast('Briefing aggiornato con successo dal cloud!', 'success');
+              }
+              setIsLoading(false);
+              setIsRefreshing(false);
+              return;
             }
           }
-        } catch (remoteErr) {
-          console.warn('[SUPABASE] Errore sincronizzazione remota:', remoteErr);
-          if (forceRemote) {
-            addToast('Impossibile sincronizzare con Supabase. Uso copia locale.', 'info');
-          }
+        } catch (supabaseErr) {
+          console.warn('[Supabase] Fetch remoto non disponibile:', supabaseErr);
         }
       }
+
+      // TIER 3: Fallback Instantaneo su SEED_BRIEFING
+      setBriefing((prev) => {
+        if (prev && Array.isArray(prev.articles) && prev.articles.length > 0) {
+          return prev;
+        }
+        setSource('seed');
+        const seedWithToday: DailyBriefing = {
+          ...SEED_BRIEFING,
+          date: todayStr || SEED_BRIEFING.date,
+        };
+        saveBriefing(seedWithToday).catch(() => {});
+        return seedWithToday;
+      });
 
       setIsLoading(false);
       setIsRefreshing(false);
     },
-    [addToast, briefing]
+    [addToast]
   );
 
   useEffect(() => {
     loadBriefing();
-    // Watchdog timer: garantisce che lo skeleton non rimanga mai appeso su iPhone
-    const watchdog = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-    return () => clearTimeout(watchdog);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Cambio Densità con Salvataggio Preferenze ---
   const handleDensityChange = (newDensity: DisplayDensity) => {
+    playSoftClick(750);
     setDensity(newDensity);
-    savePreferences({
+    const updated = {
+      ...preferences,
       density: newDensity,
-      theme: 'midnight',
-      fontSize: 'normal',
-      autoPlayAudio: false,
-    });
+    };
+    setPreferences(updated);
+    savePreferences(updated);
   };
+
+  // --- Salvataggio Profilo & Preferenze dal Forum di Benvenuto ---
+  const handleSavePreferences = useCallback(
+    (updated: UserPreferences) => {
+      playCyberChime();
+      setPreferences(updated);
+      savePreferences(updated);
+      addToast('Preferenze e priorità degli argomenti aggiornate!', 'success');
+    },
+    [addToast]
+  );
+
+  // --- Completamento Generazione On-Demand Notizie AI ---
+  const handleGenerationComplete = useCallback(
+    (newBriefing: DailyBriefing) => {
+      playCyberChime();
+      setBriefing(newBriefing);
+      setSource('remote');
+      saveBriefing(newBriefing).catch(() => {});
+      addToast('Nuovo briefing AI generato con successo!', 'success');
+    },
+    [addToast]
+  );
 
   // --- Toggle Notifiche con Feedback Toast ---
   const handleToggleNotifications = useCallback(async () => {
@@ -294,6 +404,7 @@ export default function Home() {
         const res = await subscribeToNotifications();
         if (res.success) {
           setNotificationsEnabled(true);
+          playCyberChime();
           addToast('Notifiche attivate! Riceverai il briefing alle 06:30.', 'success');
         } else {
           addToast(res.error || 'Errore configurazione notifiche push.', 'error');
@@ -309,10 +420,12 @@ export default function Home() {
     async (article: Article) => {
       const isAlreadySaved = bookmarks.some((b) => b.id === article.id);
       if (isAlreadySaved) {
+        playSoftClick(400);
         await removeBookmark(article.id);
         setBookmarks((prev) => prev.filter((b) => b.id !== article.id));
         addToast('Notizia rimossa dai salvati.', 'info');
       } else {
+        playCyberChime();
         await saveBookmark(article);
         setBookmarks((prev) => [article, ...prev]);
         addToast('Notizia salvata nei preferiti per la lettura offline!', 'success');
@@ -328,6 +441,7 @@ export default function Home() {
     await installPrompt.prompt();
     const choice = await installPrompt.userChoice;
     if (choice.outcome === 'accepted') {
+      playCyberChime();
       addToast('App installata con successo sulla schermata home!', 'success');
       setCanInstallPwa(false);
       setInstallPrompt(null);
@@ -336,11 +450,13 @@ export default function Home() {
 
   // --- Gestione Audio Bar Persistente ---
   const handlePlaySingleArticle = useCallback((article: Article) => {
+    playSoftClick(800);
     setActiveAudioArticleId(article.id);
     setIsAudioBarVisible(true);
   }, []);
 
   const handleStartFullAudio = useCallback(() => {
+    playSoftClick(850);
     if (briefing && briefing.articles.length > 0) {
       setActiveAudioArticleId(briefing.articles[0]?.id || null);
       setIsAudioBarVisible(true);
@@ -349,47 +465,205 @@ export default function Home() {
 
   // --- Gestione Stories Mode ---
   const handleOpenStoriesAtIndex = useCallback((index: number) => {
+    playSoftClick(800);
     setStoryInitialIndex(index);
     setIsStoriesOpen(true);
   }, []);
 
-  // --- Selezione Data dal Calendario ---
+  // --- Gestione Selezione Data Storica dal Calendario ---
   const handleSelectDate = useCallback(
-    (dateStr: string) => {
-      loadBriefing(false, dateStr);
-      addToast(`Caricato briefing del ${dateStr}`, 'info');
+    async (dateStr: string) => {
+      setIsLoading(true);
+      playSoftClick(750);
+      try {
+        const local = await getBriefingByDate(dateStr);
+        if (local) {
+          setBriefing(local);
+          setSource('cache');
+          setIsLoading(false);
+          addToast(`Caricato briefing del ${formatSafeDate(dateStr)}`, 'info');
+          return;
+        }
+
+        if (navigator.onLine) {
+          const supabase = createClient();
+          const { data, error } = await supabase
+            .from('daily_briefings')
+            .select('*')
+            .eq('date', dateStr)
+            .single();
+
+          if (!error && data) {
+            const row = data as unknown as { id: string; date: string; articles: Article[]; created_at: string };
+            if (Array.isArray(row.articles)) {
+              const histBriefing: DailyBriefing = {
+                id: row.id,
+                date: row.date,
+                articles: row.articles,
+                created_at: row.created_at,
+              };
+              setBriefing(histBriefing);
+              setSource('remote');
+              await saveBriefing(histBriefing);
+              setIsLoading(false);
+              addToast(`Caricato briefing del ${formatSafeDate(dateStr)}`, 'info');
+              return;
+            }
+          }
+        }
+
+        addToast(`Nessun briefing disponibile per il ${formatSafeDate(dateStr)}`, 'info');
+      } catch (err) {
+        console.warn('Errore recupero data:', err);
+        addToast('Errore durante il caricamento della data selezionata', 'error');
+      } finally {
+        setIsLoading(false);
+      }
     },
-    [loadBriefing, addToast]
+    [addToast]
   );
 
-  // --- Articoli Filtrati ---
-  const filteredArticles = useMemo<Article[]>(() => {
+  // --- 6. Global Keyboard Shortcuts Listener VisionOS Style ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Cmd / Ctrl + K: Focus Spotlight Search
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        playSoftClick(900);
+        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement | null;
+        searchInput?.focus();
+        return;
+      }
+
+      // ? or H: Toggle Keyboard Shortcuts Modal
+      if (e.key === '?' || (e.shiftKey && e.key === '/') || e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        playSoftClick(700);
+        setIsShortcutsOpen((prev) => !prev);
+        return;
+      }
+
+      // S: Toggle Scenario Simulator 2050
+      if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        playSoftClick(850);
+        setIsScenarioOpen((prev) => !prev);
+        return;
+      }
+
+      // G: Toggle AI Knowledge Graph
+      if (e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        playSoftClick(850);
+        setIsKnowledgeGraphOpen((prev) => !prev);
+        return;
+      }
+
+      // P: Toggle Radar Preferences
+      if (e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        playSoftClick(750);
+        setIsPreferencesOpen((prev) => !prev);
+        return;
+      }
+
+      // R: Trigger On-Demand AI Generation
+      if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        playSoftClick(850);
+        setIsGeneratingOpen((prev) => !prev);
+        return;
+      }
+
+      // E: Open Export Modal
+      if (e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        playSoftClick(750);
+        setIsExportModalOpen((prev) => !prev);
+        return;
+      }
+
+      // C: Open Calendar
+      if (e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        playSoftClick(750);
+        setIsCalendarOpen((prev) => !prev);
+        return;
+      }
+
+      // Space: Toggle Audio Bar Playback
+      if (e.code === 'Space') {
+        e.preventDefault();
+        playSoftClick(800);
+        if (isAudioBarVisible) {
+          setIsAudioBarVisible(false);
+        } else {
+          handleStartFullAudio();
+        }
+        return;
+      }
+
+      // Esc: Close any active modal
+      if (e.key === 'Escape') {
+        setSelectedArticleForDrawer(null);
+        setIsCalendarOpen(false);
+        setIsStoriesOpen(false);
+        setIsKnowledgeGraphOpen(false);
+        setIsExportModalOpen(false);
+        setIsPreferencesOpen(false);
+        setIsGeneratingOpen(false);
+        setIsScenarioOpen(false);
+        setIsShortcutsOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAudioBarVisible, handleStartFullAudio]);
+
+  // --- Filtro Notizie con Algoritmo di Ranking Personale ---
+  const filteredArticles = useMemo(() => {
     let list: Article[] = [];
 
     if (selectedCategory === 'Salvati') {
-      list = bookmarks;
+      list = [...bookmarks];
     } else if (briefing?.articles) {
-      list = briefing.articles;
-      if (selectedCategory !== 'Tutti') {
-        list = list.filter((a) => a.category === selectedCategory);
-      }
+      list = [...briefing.articles];
+    }
+
+    if (selectedCategory !== 'Tutti' && selectedCategory !== 'Salvati') {
+      list = list.filter((a) => a.category === selectedCategory);
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (a) =>
           a.title.toLowerCase().includes(q) ||
-          a.category.toLowerCase().includes(q) ||
           a.summary.toLowerCase().includes(q) ||
+          a.category.toLowerCase().includes(q) ||
           a.source.toLowerCase().includes(q) ||
           a.keyPoints.some((p) => p.toLowerCase().includes(q)) ||
           a.whyCounts.toLowerCase().includes(q)
       );
     }
 
+    if (selectedCategory === 'Tutti' && !searchQuery.trim()) {
+      list = sortArticlesByPreferences(list, preferences.categoryPreferences);
+    }
+
     return list;
-  }, [briefing, bookmarks, selectedCategory, searchQuery]);
+  }, [briefing, bookmarks, selectedCategory, searchQuery, preferences.categoryPreferences]);
 
   // Articolo Hero (Copertina): il primo articolo nei risultati se non c'è ricerca attiva
   const heroArticle = useMemo<Article | null>(() => {
@@ -447,15 +721,15 @@ export default function Home() {
         />
         <div
           className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(191, 90, 242, 0.07) 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgba(191, 90, 242, 0.06) 0%, transparent 70%)' }}
         />
         <div
-          className="absolute -bottom-40 left-1/4 w-[34rem] h-[34rem] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(48, 209, 88, 0.06) 0%, transparent 70%)' }}
+          className="absolute -bottom-40 left-1/4 w-[36rem] h-[36rem] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(100, 210, 255, 0.05) 0%, transparent 70%)' }}
         />
       </div>
 
-      {/* Header Sticky con salute mattutino, data e controlli */}
+      {/* Header Bar Sticky Apple Stile */}
       <Header
         isOnline={isOnline}
         notificationsEnabled={notificationsEnabled}
@@ -464,6 +738,15 @@ export default function Home() {
         onInstallPwa={handleInstallPwa}
         onStartAudioBriefing={handleStartFullAudio}
         onOpenCalendar={() => setIsCalendarOpen(true)}
+        onOpenPreferences={() => {
+          setIsOnboarding(false);
+          setIsPreferencesOpen(true);
+        }}
+        onTriggerGenerate={() => setIsGeneratingOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        onOpenScenario={() => setIsScenarioOpen(true)}
+        userRole={preferences.userRole}
+        userName={preferences.userName}
       />
 
       {/* Main Container - Ottimizzato Desktop e Mobile */}
@@ -483,14 +766,14 @@ export default function Home() {
             </div>
             <button
               onClick={handleInstallPwa}
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#0071e3] hover:bg-[#0077ed] transition-colors flex-shrink-0 shadow-md"
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#0071e3] hover:bg-[#0077ed] transition-colors flex-shrink-0 shadow-md cursor-pointer"
             >
               Installa
             </button>
           </motion.div>
         )}
 
-        {/* Executive Pulse Dashboard (Metriche, Stories CTA, Mappa AI, Export) */}
+        {/* Executive Pulse Dashboard (Metriche, Stories CTA, Mappa AI, Export, Genera AI, Scenario 2050) */}
         {!isLoading && briefing && (
           <ExecutivePulse
             briefing={briefing}
@@ -498,6 +781,12 @@ export default function Home() {
             onOpenKnowledgeGraph={() => setIsKnowledgeGraphOpen(true)}
             onExport={() => setIsExportModalOpen(true)}
             isOnline={isOnline}
+            onTriggerGenerate={() => setIsGeneratingOpen(true)}
+            onOpenPreferences={() => {
+              setIsOnboarding(false);
+              setIsPreferencesOpen(true);
+            }}
+            onOpenScenarioSimulator={() => setIsScenarioOpen(true)}
           />
         )}
 
@@ -508,7 +797,10 @@ export default function Home() {
             <div className="flex-1 min-w-0">
               <CategoryFilter
                 selected={selectedCategory}
-                onSelect={setSelectedCategory}
+                onSelect={(cat) => {
+                  playSoftClick(700);
+                  setSelectedCategory(cat);
+                }}
                 counts={categoryCounts}
                 bookmarkCount={bookmarks.length}
               />
@@ -545,8 +837,11 @@ export default function Home() {
 
               {briefing.date && (
                 <button
-                  onClick={() => setIsCalendarOpen(true)}
-                  className="text-[#86868b] hover:text-white transition-colors text-[11px] font-medium underline decoration-dotted"
+                  onClick={() => {
+                    playSoftClick(750);
+                    setIsCalendarOpen(true);
+                  }}
+                  className="text-[#86868b] hover:text-white transition-colors text-[11px] font-medium underline decoration-dotted cursor-pointer"
                   title="Cambia data"
                 >
                   {formatSafeDate(briefing.date)}
@@ -559,11 +854,12 @@ export default function Home() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  playSoftClick(850);
                   triggerHaptic(15);
                   loadBriefing(true);
                 }}
                 disabled={isRefreshing}
-                className="flex items-center gap-1.5 text-[#86868b] hover:text-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-[#86868b] hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
                 title="Sincronizza briefing con Supabase"
               >
                 <motion.div
@@ -586,7 +882,10 @@ export default function Home() {
             article={heroArticle}
             isBookmarked={bookmarkedIds.has(heroArticle.id)}
             onToggleBookmark={handleToggleBookmark}
-            onOpenArticle={(art) => setSelectedArticleForDrawer(art)}
+            onOpenArticle={(art) => {
+              playSoftClick(800);
+              setSelectedArticleForDrawer(art);
+            }}
             onPlayAudio={handlePlaySingleArticle}
             onShowToast={addToast}
           />
@@ -604,6 +903,7 @@ export default function Home() {
             variant={emptyVariant}
             searchQuery={searchQuery}
             onResetSearch={() => {
+              playSoftClick(750);
               setSearchQuery('');
               setSelectedCategory('Tutti');
             }}
@@ -622,7 +922,10 @@ export default function Home() {
                   onToggleBookmark={handleToggleBookmark}
                   onPlaySingleArticle={handlePlaySingleArticle}
                   onShowToast={addToast}
-                  onOpenArticle={(art) => setSelectedArticleForDrawer(art)}
+                  onOpenArticle={(art) => {
+                    playSoftClick(800);
+                    setSelectedArticleForDrawer(art);
+                  }}
                 />
               ))}
             </AnimatePresence>
@@ -630,7 +933,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Drawer Lettura Immersiva Zen */}
+      {/* Drawer Lettura Immersiva Zen con 4 Lenti Cognitive & Neural Copilot 3000 */}
       <ArticleDrawer
         article={selectedArticleForDrawer}
         isOpen={selectedArticleForDrawer !== null}
@@ -651,7 +954,7 @@ export default function Home() {
         onSelectDate={handleSelectDate}
       />
 
-      {/* Mini-Player Vocale Fluttuante Persistente */}
+      {/* Mini-Player Vocale Fluttuante Persistente con 432Hz Deep Space Drone */}
       <AnimatePresence>
         {isAudioBarVisible && briefing && (
           <FloatingAudioBar
@@ -679,7 +982,7 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Modale AI Knowledge Graph */}
+      {/* Quantum Knowledge Nexus 3000 */}
       <AnimatePresence>
         {isKnowledgeGraphOpen && briefing && (
           <KnowledgeGraphModal
@@ -687,6 +990,7 @@ export default function Home() {
             isOpen={isKnowledgeGraphOpen}
             onClose={() => setIsKnowledgeGraphOpen(false)}
             onSelectArticle={(art) => {
+              playSoftClick(850);
               setSelectedArticleForDrawer(art);
             }}
           />
@@ -704,6 +1008,52 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
+
+      {/* Vision 3000: Simulatore di Scenari Predittivi 2030-2050 */}
+      <AnimatePresence>
+        {isScenarioOpen && briefing && (
+          <ScenarioSimulatorModal
+            isOpen={isScenarioOpen}
+            onClose={() => setIsScenarioOpen(false)}
+            briefing={briefing}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Vision 3000: VisionOS Keyboard Shortcuts HUD */}
+      <AnimatePresence>
+        {isShortcutsOpen && (
+          <KeyboardShortcutsModal
+            isOpen={isShortcutsOpen}
+            onClose={() => setIsShortcutsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Forum di Benvenuto & Gestione Preferenze Radar */}
+      <WelcomePreferencesModal
+        isOpen={isPreferencesOpen}
+        onClose={() => setIsPreferencesOpen(false)}
+        preferences={preferences}
+        onSavePreferences={handleSavePreferences}
+        onTriggerGeneration={() => setIsGeneratingOpen(true)}
+        isOnboarding={isOnboarding}
+      />
+
+      {/* Modale Generazione Notizie AI On-Demand */}
+      <GenerationModal
+        isOpen={isGeneratingOpen}
+        onClose={() => setIsGeneratingOpen(false)}
+        onComplete={handleGenerationComplete}
+        preferredCategories={
+          preferences.categoryPreferences
+            ? (Object.entries(preferences.categoryPreferences)
+                .filter(([_, pref]) => pref?.interest === 'top' || pref?.interest === 'high')
+                .map(([cat]) => cat) as Category[])
+            : ['Aerospazio & Aviazione', 'Tech & AI', 'Energia & Sostenibilità', 'Cybersecurity']
+        }
+        isOnline={isOnline}
+      />
 
       {/* Toast Notifications Globali */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

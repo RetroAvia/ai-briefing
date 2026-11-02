@@ -87,6 +87,28 @@ const RSS_FEEDS: FeedConfig[] = [
     source: 'ESA Space News',
     categoryHint: 'Aerospazio & Aviazione',
   },
+  // Cybersecurity & Difesa Digitale
+  {
+    url: 'https://thehackernews.com/feeds/posts/default',
+    source: 'The Hacker News',
+    categoryHint: 'Cybersecurity',
+  },
+  {
+    url: 'https://www.bleepingcomputer.com/feed/',
+    source: 'BleepingComputer',
+    categoryHint: 'Cybersecurity',
+  },
+  // Energia & Sostenibilità
+  {
+    url: 'https://www.qualenergia.it/feed/',
+    source: 'QualEnergia',
+    categoryHint: 'Energia & Sostenibilità',
+  },
+  {
+    url: 'https://electrek.co/feed/',
+    source: 'Electrek Energy',
+    categoryHint: 'Energia & Sostenibilità',
+  },
 ];
 
 // Fallback di riserva se tutti i feed remoti sono temporaneamente bloccati o irraggiungibili

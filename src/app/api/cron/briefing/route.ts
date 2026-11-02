@@ -49,10 +49,12 @@ const ARTICLES_SCHEMA = {
             type: 'string',
             enum: [
               'Tech & AI',
+              'Aerospazio & Aviazione',
               'Mercati & Economia',
               'Geopolitica',
               'Scienza',
-              'Aerospazio & Aviazione',
+              'Energia & Sostenibilità',
+              'Cybersecurity',
               'Italia',
               'Altro',
             ],
@@ -129,7 +131,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 Il tuo obiettivo è sintetizzare le 10 notizie più cruciali della giornata per un professionista in movimento (lettura mattutina in metropolitana, offline-first).
 
 Requisiti:
-- Seleziona esattamente 10 notizie bilanciando le categorie: Tech & AI, Mercati & Economia, Geopolitica, Scienza, Aerospazio & Aviazione, Italia.
+- Seleziona esattamente 10-12 notizie bilanciando con cura tutte le categorie: Tech & AI, Aerospazio & Aviazione, Mercati & Economia, Geopolitica, Scienza, Energia & Sostenibilità, Cybersecurity, Italia. Assicurati che ogni categoria sia rappresentata da notizie di alto valore.
 - Scrivi in italiano impeccabile, chiaro e autorevole.
 - Per ogni articolo fornisci:
   * id univoco: "article-1", "article-2", ...

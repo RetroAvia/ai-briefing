@@ -1,9 +1,22 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Bell, BellOff, Wifi, WifiOff, Download, Volume2, Calendar } from 'lucide-react';
+import {
+  Bell,
+  BellOff,
+  Wifi,
+  WifiOff,
+  Download,
+  Volume2,
+  Calendar,
+  Sliders,
+  Sparkles,
+  Command,
+  Orbit,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { triggerHaptic } from '@/lib/export';
+import { playSoftClick } from '@/lib/sound';
 
 interface HeaderProps {
   isOnline: boolean;
@@ -13,14 +26,29 @@ interface HeaderProps {
   onInstallPwa?: () => void;
   onStartAudioBriefing?: () => void;
   onOpenCalendar?: () => void;
+  onOpenPreferences?: () => void;
+  onTriggerGenerate?: () => void;
+  onOpenShortcuts?: () => void;
+  onOpenScenario?: () => void;
+  userRole?: string;
+  userName?: string;
 }
 
-function getGreeting(): string {
+function getGreeting(role?: string, name?: string): string {
   const hour = new Date().getHours();
-  if (hour < 5) return 'Buonanotte';
-  if (hour < 12) return 'Buongiorno';
-  if (hour < 18) return 'Buon pomeriggio';
-  return 'Buonasera';
+  let prefix = 'Buongiorno';
+  if (hour < 5) prefix = 'Buonanotte';
+  else if (hour < 12) prefix = 'Buongiorno';
+  else if (hour < 18) prefix = 'Buon pomeriggio';
+  else prefix = 'Buonasera';
+
+  if (name && name.trim()) {
+    return `${prefix}, ${name.trim()}`;
+  }
+  if (role && role.trim()) {
+    return `${prefix}, ${role.trim()}`;
+  }
+  return prefix;
 }
 
 function getItalianDate(): string {
@@ -43,14 +71,20 @@ export default function Header({
   onInstallPwa,
   onStartAudioBriefing,
   onOpenCalendar,
+  onOpenPreferences,
+  onTriggerGenerate,
+  onOpenShortcuts,
+  onOpenScenario,
+  userRole,
+  userName,
 }: HeaderProps) {
   const [greeting, setGreeting] = useState('Buongiorno');
   const [date, setDate] = useState('');
 
   useEffect(() => {
-    setGreeting(getGreeting());
+    setGreeting(getGreeting(userRole, userName));
     setDate(getItalianDate());
-  }, []);
+  }, [userRole, userName]);
 
   return (
     <motion.header
@@ -62,7 +96,7 @@ export default function Header({
       <div
         className="px-4 py-3 sm:px-6 lg:px-8 border-b"
         style={{
-          background: 'rgba(10, 10, 14, 0.88)',
+          background: 'rgba(10, 10, 14, 0.90)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -103,6 +137,78 @@ export default function Header({
 
           {/* Action buttons (Stile iOS Control Center) */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Pulsante Genera Notizie AI On-Demand */}
+            {onTriggerGenerate && (
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => {
+                  playSoftClick(850);
+                  triggerHaptic(20);
+                  onTriggerGenerate();
+                }}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold text-white shadow-md transition-all cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #0071e3 0%, #64d2ff 100%)',
+                }}
+                title="Genera subito notizie fresche per tutte le categorie con l'AI"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
+                <span className="hidden sm:inline">Genera AI</span>
+              </motion.button>
+            )}
+
+            {/* Scenario Simulator Shortcut in Header */}
+            {onOpenScenario && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  playSoftClick(950);
+                  triggerHaptic(15);
+                  onOpenScenario();
+                }}
+                className="w-9 h-9 rounded-full hidden md:flex items-center justify-center text-slate-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-all cursor-pointer"
+                title="Simulatore Scenario Futuro 2050 (Tasto S)"
+              >
+                <Orbit className="w-4 h-4 text-[#bf5af2]" />
+              </motion.button>
+            )}
+
+            {/* Preferenze & Radar AI Hub */}
+            {onOpenPreferences && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  playSoftClick(750);
+                  triggerHaptic(15);
+                  onOpenPreferences();
+                }}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-all cursor-pointer"
+                title="Personalizza le tue categorie preferite e priorità (Tasto P)"
+              >
+                <Sliders className="w-4 h-4 text-[#64d2ff]" />
+              </motion.button>
+            )}
+
+            {/* Keyboard Shortcuts HUD */}
+            {onOpenShortcuts && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  playSoftClick(700);
+                  triggerHaptic(15);
+                  onOpenShortcuts();
+                }}
+                className="w-9 h-9 rounded-full hidden sm:flex items-center justify-center text-slate-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-all cursor-pointer"
+                title="Scorciatoie da tastiera (Tasto ?)"
+              >
+                <Command className="w-4 h-4 text-[#86868b]" />
+              </motion.button>
+            )}
+
             {/* Install PWA Button */}
             {canInstallPwa && (
               <motion.button
@@ -110,8 +216,11 @@ export default function Header({
                 animate={{ scale: 1, opacity: 1 }}
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={onInstallPwa}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-white/10 hover:bg-white/15 border border-white/10 transition-all"
+                onClick={() => {
+                  playSoftClick(800);
+                  if (onInstallPwa) onInstallPwa();
+                }}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-white/10 hover:bg-white/15 border border-white/10 transition-all cursor-pointer"
                 title="Aggiungi alla schermata Home"
               >
                 <Download className="w-3.5 h-3.5 text-[#2997ff]" />
@@ -125,11 +234,12 @@ export default function Header({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  playSoftClick(750);
                   triggerHaptic(15);
                   onOpenCalendar();
                 }}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-all"
-                title="Archivio date precedenti"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-all cursor-pointer"
+                title="Archivio date precedenti (Tasto C)"
               >
                 <Calendar className="w-4 h-4 text-[#bf5af2]" />
               </motion.button>
@@ -141,11 +251,12 @@ export default function Header({
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => {
+                  playSoftClick(850);
                   triggerHaptic(15);
                   onStartAudioBriefing();
                 }}
-                className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-white/[0.07] hover:bg-white/[0.14] border border-white/[0.08] transition-all"
-                title="Ascolta rassegna stampa"
+                className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-white/[0.07] hover:bg-white/[0.14] border border-white/[0.08] transition-all cursor-pointer"
+                title="Ascolta rassegna stampa vocale (Tasto Spazio)"
               >
                 <Volume2 className="w-3.5 h-3.5 text-[#2997ff]" />
                 <span className="hidden sm:inline">Ascolta</span>
@@ -177,8 +288,11 @@ export default function Header({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={onToggleNotifications}
-              className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all ${
+              onClick={() => {
+                playSoftClick(900);
+                onToggleNotifications();
+              }}
+              className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
                 notificationsEnabled
                   ? 'bg-[#2997ff]/20 border-[#2997ff]/40 text-[#2997ff] shadow-[0_0_15px_rgba(41,151,255,0.25)]'
                   : 'bg-white/[0.06] border-white/[0.08] text-[#86868b] hover:text-white hover:bg-white/[0.12]'

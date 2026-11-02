@@ -39,12 +39,35 @@ import {
   unsubscribeFromNotifications,
 } from '@/lib/push';
 import { triggerHaptic } from '@/lib/export';
-import type { Article, DailyBriefing, DisplayDensity, UserPreferences } from '@/types';
+import type { Article, DailyBriefing, DisplayDensity } from '@/types';
 import { ALL_CATEGORIES } from '@/types';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+function formatSafeDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('T')[0]?.split('-');
+    if (parts && parts.length === 3) {
+      const year = parseInt(parts[0]!, 10);
+      const month = parseInt(parts[1]!, 10) - 1;
+      const day = parseInt(parts[2]!, 10);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+      }
+    }
+    const fallback = new Date(dateStr);
+    if (!isNaN(fallback.getTime())) {
+      return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(fallback);
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
 }
 
 export default function Home() {
@@ -99,7 +122,13 @@ export default function Home() {
 
   // --- 1. Service Worker & PWA Install Listener ---
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
+    const isSecureContext =
+      typeof window !== 'undefined' &&
+      (window.location.protocol === 'https:' ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1');
+
+    if ('serviceWorker' in navigator && isSecureContext) {
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
         .catch((err) => console.warn('[SW] Registrazione SW fallita:', err));
@@ -384,21 +413,32 @@ export default function Home() {
 
   const bookmarkedIds = useMemo(() => new Set(bookmarks.map((b) => b.id)), [bookmarks]);
 
+  // Calcolo classe griglia articoli
+  const feedGridClass = useMemo(() => {
+    if (density === 'magazine') {
+      return 'grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6';
+    }
+    if (density === 'minimal') {
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4';
+    }
+    return 'grid grid-cols-1 gap-2.5 max-w-4xl mx-auto';
+  }, [density]);
+
   return (
-    <div className="min-h-dvh bg-[#08090d] text-white flex flex-col selection:bg-violet-500/30 selection:text-white font-sans antialiased">
-      {/* Background ambient mesh glow */}
+    <div className="min-h-dvh bg-[#000000] text-white flex flex-col selection:bg-[#2997ff]/30 selection:text-white font-sans antialiased">
+      {/* Background ambient cosmic mesh glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div
-          className="absolute -top-40 -left-40 w-[30rem] h-[30rem] rounded-full opacity-[0.08] blur-[100px]"
-          style={{ background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)' }}
+          className="absolute -top-40 -left-40 w-[32rem] h-[32rem] rounded-full opacity-[0.07] blur-[120px]"
+          style={{ background: 'radial-gradient(circle, #2997ff 0%, transparent 70%)' }}
         />
         <div
-          className="absolute top-1/3 -right-40 w-[28rem] h-[28rem] rounded-full opacity-[0.07] blur-[100px]"
-          style={{ background: 'radial-gradient(circle, #06b6d4 0%, transparent 70%)' }}
+          className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] rounded-full opacity-[0.06] blur-[120px]"
+          style={{ background: 'radial-gradient(circle, #bf5af2 0%, transparent 70%)' }}
         />
         <div
-          className="absolute -bottom-40 left-1/4 w-[32rem] h-[32rem] rounded-full opacity-[0.06] blur-[100px]"
-          style={{ background: 'radial-gradient(circle, #10b981 0%, transparent 70%)' }}
+          className="absolute -bottom-40 left-1/4 w-[34rem] h-[34rem] rounded-full opacity-[0.05] blur-[120px]"
+          style={{ background: 'radial-gradient(circle, #30d158 0%, transparent 70%)' }}
         />
       </div>
 
@@ -413,24 +453,24 @@ export default function Home() {
         onOpenCalendar={() => setIsCalendarOpen(true)}
       />
 
-      {/* Main Container */}
-      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 w-full flex-1 pb-28">
+      {/* Main Container - Ottimizzato Desktop e Mobile */}
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 w-full flex-1 pb-32">
         {/* Banner installazione PWA per smartphone */}
         {canInstallPwa && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="sm:hidden mb-4 p-3.5 rounded-2xl border border-cyan-500/35 bg-cyan-950/25 backdrop-blur-md flex items-center justify-between gap-3 shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+            className="sm:hidden mb-4 p-3.5 rounded-2xl border border-[#2997ff]/30 bg-[#2997ff]/10 backdrop-blur-xl flex items-center justify-between gap-3 shadow-lg"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <Download className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-              <p className="text-xs text-cyan-200 font-bold truncate">
-                Installa la PWA per lettura offline in metropolitana
+              <Download className="w-4 h-4 text-[#2997ff] flex-shrink-0" />
+              <p className="text-xs text-[#d2d2d7] font-semibold truncate">
+                Installa per la lettura offline in metro
               </p>
             </div>
             <button
               onClick={handleInstallPwa}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-black text-white bg-cyan-600 hover:bg-cyan-500 transition-colors flex-shrink-0 shadow-md"
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#0071e3] hover:bg-[#0077ed] transition-colors flex-shrink-0 shadow-md"
             >
               Installa
             </button>
@@ -448,10 +488,10 @@ export default function Home() {
           />
         )}
 
-        {/* Barra di Ricerca Client-Side Istantanea */}
-        <div className="space-y-3 mb-5">
+        {/* Barra di Ricerca Client-Side Istantanea Apple Spotlight Style */}
+        <div className="space-y-3.5 mb-6">
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
-          <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
             <div className="flex-1 min-w-0">
               <CategoryFilter
                 selected={selectedCategory}
@@ -470,19 +510,19 @@ export default function Home() {
         {!isLoading && briefing && (
           <div className="flex items-center justify-between gap-2 mb-4 text-xs">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-slate-400 font-bold">
+              <span className="text-[#86868b] font-semibold">
                 {filteredArticles.length} {filteredArticles.length === 1 ? 'notizia' : 'notizie'}
                 {selectedCategory !== 'Tutti' && ` • ${selectedCategory}`}
               </span>
 
               {source === 'cache' && (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black tracking-wide">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#ff9f0a]/10 border border-[#ff9f0a]/30 text-[#ff9f0a] text-[10px] font-bold tracking-wide">
                   ⚡ Copia locale (Offline)
                 </span>
               )}
 
               {source === 'seed' && (
-                <span className="px-2.5 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 text-[10px] font-black flex items-center gap-1">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#bf5af2]/15 border border-[#bf5af2]/30 text-[#bf5af2] text-[10px] font-bold flex items-center gap-1">
                   <Sparkles className="w-2.5 h-2.5" /> Briefing iniziale
                 </span>
               )}
@@ -490,12 +530,10 @@ export default function Home() {
               {briefing.date && (
                 <button
                   onClick={() => setIsCalendarOpen(true)}
-                  className="text-slate-400 hover:text-white transition-colors text-[11px] font-semibold underline decoration-dotted"
+                  className="text-[#86868b] hover:text-white transition-colors text-[11px] font-medium underline decoration-dotted"
                   title="Cambia data"
                 >
-                  {new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(
-                    new Date(briefing.date + 'T00:00:00')
-                  )}
+                  {formatSafeDate(briefing.date)}
                 </button>
               )}
             </div>
@@ -509,16 +547,16 @@ export default function Home() {
                   loadBriefing(true);
                 }}
                 disabled={isRefreshing}
-                className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors disabled:opacity-50"
-                title="Aggiorna briefing da Supabase"
+                className="flex items-center gap-1.5 text-[#86868b] hover:text-white transition-colors disabled:opacity-50"
+                title="Sincronizza briefing con Supabase"
               >
                 <motion.div
                   animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
                   transition={{ duration: 0.8, repeat: isRefreshing ? Infinity : 0, ease: 'linear' }}
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-violet-400" />
+                  <RefreshCw className="w-3.5 h-3.5 text-[#2997ff]" />
                 </motion.div>
-                <span className="hidden sm:inline font-bold">
+                <span className="hidden sm:inline font-semibold">
                   {isRefreshing ? 'Sincronizzazione...' : 'Sincronizza'}
                 </span>
               </motion.button>
@@ -538,17 +576,24 @@ export default function Home() {
           />
         )}
 
-        {/* Contenuto Notizie o Loading Skeleton */}
+        {/* Contenuto Notizie o Loading Skeleton in Griglia Responsiva */}
         {isLoading ? (
-          <div className="grid gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className={feedGridClass}>
+            {Array.from({ length: density === 'magazine' ? 4 : 6 }).map((_, i) => (
               <SkeletonCard key={i} index={i} />
             ))}
           </div>
         ) : filteredArticles.length === 0 ? (
-          <EmptyState variant={emptyVariant} searchQuery={searchQuery} />
+          <EmptyState
+            variant={emptyVariant}
+            searchQuery={searchQuery}
+            onResetSearch={() => {
+              setSearchQuery('');
+              setSelectedCategory('Tutti');
+            }}
+          />
         ) : (
-          <motion.div className="grid gap-4" layout>
+          <motion.div className={feedGridClass} layout>
             <AnimatePresence mode="popLayout">
               {feedArticles.map((article, i) => (
                 <NewsCard

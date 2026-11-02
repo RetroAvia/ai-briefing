@@ -45,7 +45,7 @@ const RSS_FEEDS: FeedConfig[] = [
     categoryHint: 'Geopolitica',
   },
   {
-    url: 'http://feeds.bbci.co.uk/news/world/rss.xml',
+    url: 'https://feeds.bbci.co.uk/news/world/rss.xml',
     source: 'BBC World News',
     categoryHint: 'Geopolitica',
   },

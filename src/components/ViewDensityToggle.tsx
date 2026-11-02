@@ -14,11 +14,11 @@ export default function ViewDensityToggle({ density, onChange }: ViewDensityTogg
   const options: { id: DisplayDensity; label: string; icon: typeof LayoutGrid }[] = [
     { id: 'magazine', label: 'Rivista', icon: LayoutGrid },
     { id: 'compact', label: 'Compatto', icon: List },
-    { id: 'minimal', label: 'Minimale', icon: AlignJustify },
+    { id: 'minimal', label: 'Minimo', icon: AlignJustify },
   ];
 
   return (
-    <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/40 border border-white/5 backdrop-blur-md">
+    <div className="flex items-center gap-0.5 p-1 rounded-full bg-white/[0.06] border border-white/[0.08] backdrop-blur-xl">
       {options.map((opt) => {
         const Icon = opt.icon;
         const isActive = density === opt.id;
@@ -30,15 +30,15 @@ export default function ViewDensityToggle({ density, onChange }: ViewDensityTogg
               triggerHaptic(10);
               onChange(opt.id);
             }}
-            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              isActive ? 'text-white' : 'text-[#86868b] hover:text-[#d2d2d7]'
             }`}
           >
             {isActive && (
               <motion.div
-                layoutId="activeDensity"
-                className="absolute inset-0 rounded-xl bg-violet-600/40 border border-violet-500/50 shadow-[0_0_12px_rgba(124,58,237,0.3)]"
-                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                layoutId="activeDensityApple"
+                className="absolute inset-0 rounded-full bg-white/15 border border-white/20 shadow-sm"
+                transition={{ type: 'spring', damping: 28, stiffness: 400 }}
               />
             )}
             <span className="relative z-10 flex items-center gap-1.5">

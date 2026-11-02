@@ -4,6 +4,9 @@ import { fetchRecentArticles } from '@/lib/rss';
 import OpenAI from 'openai';
 import webpush from 'web-push';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 // Configurazione lazy di Web Push per evitare errori a build-time
 let vapidConfigured = false;
 function configureVapid() {
@@ -37,6 +40,7 @@ const ARTICLES_SCHEMA = {
           'keyPoints',
           'whyCounts',
           'summary',
+          'impactScore',
         ],
         properties: {
           id: { type: 'string', description: 'Identificativo univoco progressivo (es. article-1)' },
@@ -48,6 +52,7 @@ const ARTICLES_SCHEMA = {
           source: { type: 'string', description: 'Nome della testata sorgente' },
           sourceUrl: { type: 'string', description: 'URL dell\'articolo originale' },
           readingTimeMinutes: { type: 'number', description: 'Tempo di lettura stimato tra 1 e 5 minuti' },
+          impactScore: { type: 'number', description: 'Punteggio di impatto strategico da 1 a 100' },
           keyPoints: {
             type: 'array',
             items: { type: 'string' },

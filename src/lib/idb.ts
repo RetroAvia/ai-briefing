@@ -2,7 +2,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import type { CachedBriefing, DailyBriefing, Article, UserPreferences } from '@/types';
 
 const DB_NAME = 'ai-briefing-db';
-const DB_VERSION = 3; // Aggiornato per preferenze utente e archivio storico
+const DB_VERSION = 3;
 const STORE_BRIEFINGS = 'briefings';
 const STORE_BOOKMARKS = 'bookmarks';
 const STORE_PREFERENCES = 'preferences';
@@ -184,37 +184,83 @@ export const SEED_BRIEFING: DailyBriefing = {
   ],
 };
 
-let dbPromise: Promise<IDBPDatabase> | null = null;
+// Fallback in memoria per browser mobile con IndexedDB disabilitato o in modalità anonima
+const memoryStore = new Map<string, unknown>();
 
-function getDB(): Promise<IDBPDatabase> {
-  if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion) {
-        if (!db.objectStoreNames.contains(STORE_BRIEFINGS)) {
-          db.createObjectStore(STORE_BRIEFINGS, { keyPath: 'date' });
-        }
-        if (!db.objectStoreNames.contains(STORE_BOOKMARKS)) {
-          db.createObjectStore(STORE_BOOKMARKS, { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains(STORE_PREFERENCES)) {
-          db.createObjectStore(STORE_PREFERENCES);
-        }
-      },
-    });
+function isIndexedDBSupported(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return 'indexedDB' in window && window.indexedDB !== null && typeof window.indexedDB !== 'undefined';
+  } catch {
+    return false;
   }
-  return dbPromise;
 }
 
-// Salva o aggiorna un briefing giornaliero in IndexedDB
-export async function saveBriefing(briefing: DailyBriefing): Promise<void> {
+let dbPromise: Promise<IDBPDatabase> | null = null;
+
+async function getDB(): Promise<IDBPDatabase | null> {
+  if (!isIndexedDBSupported()) return null;
+
+  if (!dbPromise) {
+    dbPromise = openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        try {
+          if (!db.objectStoreNames.contains(STORE_BRIEFINGS)) {
+            db.createObjectStore(STORE_BRIEFINGS, { keyPath: 'date' });
+          }
+          if (!db.objectStoreNames.contains(STORE_BOOKMARKS)) {
+            db.createObjectStore(STORE_BOOKMARKS, { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains(STORE_PREFERENCES)) {
+            db.createObjectStore(STORE_PREFERENCES);
+          }
+        } catch (e) {
+          console.warn('[IDB] Errore in upgrade:', e);
+        }
+      },
+      blocked() {
+        console.warn('[IDB] Database bloccato da un\'altra scheda');
+      },
+      blocking() {
+        console.warn('[IDB] Chiusura vecchia connessione database');
+      },
+    }).catch((err) => {
+      console.warn('[IDB] Inizializzazione fallita (possibile modalità privata mobile):', err);
+      dbPromise = null;
+      return null as unknown as IDBPDatabase;
+    });
+  }
+
   try {
-    const db = await getDB();
+    const db = await dbPromise;
+    return db || null;
+  } catch {
+    dbPromise = null;
+    return null;
+  }
+}
+
+// Salva o aggiorna un briefing giornaliero in IndexedDB con fallback localStorage
+export async function saveBriefing(briefing: DailyBriefing): Promise<void> {
+  if (!briefing || !briefing.date) return;
+  try {
     const cached: CachedBriefing = {
       date: briefing.date,
       briefing,
       cachedAt: Date.now(),
     };
-    await db.put(STORE_BRIEFINGS, cached);
+
+    const db = await getDB();
+    if (db) {
+      await db.put(STORE_BRIEFINGS, cached);
+    } else {
+      // Fallback localStorage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(`briefing_${briefing.date}`, JSON.stringify(cached));
+        window.localStorage.setItem('latest_briefing_date', briefing.date);
+      }
+      memoryStore.set(`briefing_${briefing.date}`, cached);
+    }
   } catch (err) {
     console.warn('[IDB] Errore salvataggio briefing:', err);
   }
@@ -224,13 +270,29 @@ export async function saveBriefing(briefing: DailyBriefing): Promise<void> {
 export async function getLatestBriefing(): Promise<DailyBriefing | null> {
   try {
     const db = await getDB();
-    const all = await db.getAll(STORE_BRIEFINGS);
-    if (all.length === 0) return null;
+    if (db) {
+      const all = await db.getAll(STORE_BRIEFINGS);
+      if (all && all.length > 0) {
+        const sorted = (all as CachedBriefing[]).sort((a, b) =>
+          b.date.localeCompare(a.date)
+        );
+        return sorted[0]?.briefing ?? null;
+      }
+    }
 
-    const sorted = (all as CachedBriefing[]).sort((a, b) =>
-      b.date.localeCompare(a.date)
-    );
-    return sorted[0]?.briefing ?? null;
+    // Fallback localStorage per smartphone
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const latestDate = window.localStorage.getItem('latest_briefing_date');
+      if (latestDate) {
+        const raw = window.localStorage.getItem(`briefing_${latestDate}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as CachedBriefing;
+          return parsed.briefing || null;
+        }
+      }
+    }
+
+    return null;
   } catch (err) {
     console.warn('[IDB] Errore recupero ultimo briefing:', err);
     return null;
@@ -239,10 +301,22 @@ export async function getLatestBriefing(): Promise<DailyBriefing | null> {
 
 // Recupera briefing per data specifica (Archivio Storico)
 export async function getBriefingByDate(date: string): Promise<DailyBriefing | null> {
+  if (!date) return null;
   try {
     const db = await getDB();
-    const cached = (await db.get(STORE_BRIEFINGS, date)) as CachedBriefing | undefined;
-    return cached?.briefing ?? null;
+    if (db) {
+      const cached = (await db.get(STORE_BRIEFINGS, date)) as CachedBriefing | undefined;
+      return cached?.briefing ?? null;
+    }
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(`briefing_${date}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as CachedBriefing;
+        return parsed.briefing || null;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -252,8 +326,21 @@ export async function getBriefingByDate(date: string): Promise<DailyBriefing | n
 export async function getAvailableBriefingDates(): Promise<string[]> {
   try {
     const db = await getDB();
-    const all = await db.getAllKeys(STORE_BRIEFINGS);
-    return (all as string[]).sort((a, b) => b.localeCompare(a));
+    if (db) {
+      const all = await db.getAllKeys(STORE_BRIEFINGS);
+      return (all as string[]).sort((a, b) => b.localeCompare(a));
+    }
+
+    const dates: string[] = [];
+    if (typeof window !== 'undefined' && window.localStorage) {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith('briefing_')) {
+          dates.push(key.replace('briefing_', ''));
+        }
+      }
+    }
+    return dates.sort((a, b) => b.localeCompare(a));
   } catch {
     return [];
   }
@@ -261,18 +348,32 @@ export async function getAvailableBriefingDates(): Promise<string[]> {
 
 // Segnalibri (Bookmarks) salvati localmente per lettura offline
 export async function saveBookmark(article: Article): Promise<void> {
+  if (!article || !article.id) return;
   try {
     const db = await getDB();
-    await db.put(STORE_BOOKMARKS, { ...article, savedAt: Date.now() });
+    if (db) {
+      await db.put(STORE_BOOKMARKS, { ...article, savedAt: Date.now() });
+    } else if (typeof window !== 'undefined' && window.localStorage) {
+      const current = await getBookmarks();
+      const updated = [article, ...current.filter((b) => b.id !== article.id)];
+      window.localStorage.setItem('user_bookmarks', JSON.stringify(updated));
+    }
   } catch (err) {
     console.warn('[IDB] Errore salvataggio bookmark:', err);
   }
 }
 
 export async function removeBookmark(articleId: string): Promise<void> {
+  if (!articleId) return;
   try {
     const db = await getDB();
-    await db.delete(STORE_BOOKMARKS, articleId);
+    if (db) {
+      await db.delete(STORE_BOOKMARKS, articleId);
+    } else if (typeof window !== 'undefined' && window.localStorage) {
+      const current = await getBookmarks();
+      const updated = current.filter((b) => b.id !== articleId);
+      window.localStorage.setItem('user_bookmarks', JSON.stringify(updated));
+    }
   } catch (err) {
     console.warn('[IDB] Errore rimozione bookmark:', err);
   }
@@ -281,11 +382,19 @@ export async function removeBookmark(articleId: string): Promise<void> {
 export async function getBookmarks(): Promise<Article[]> {
   try {
     const db = await getDB();
-    const all = await db.getAll(STORE_BOOKMARKS);
-    return (all as Article[]).sort(
-      (a, b) =>
-        ((b as { savedAt?: number }).savedAt || 0) - ((a as { savedAt?: number }).savedAt || 0)
-    );
+    if (db) {
+      const all = await db.getAll(STORE_BOOKMARKS);
+      return (all as Article[]).sort(
+        (a, b) =>
+          ((b as { savedAt?: number }).savedAt || 0) - ((a as { savedAt?: number }).savedAt || 0)
+      );
+    }
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem('user_bookmarks');
+      if (raw) return JSON.parse(raw);
+    }
+    return [];
   } catch (err) {
     console.warn('[IDB] Errore recupero bookmarks:', err);
     return [];
@@ -296,8 +405,16 @@ export async function getBookmarks(): Promise<Article[]> {
 export async function getPreferences(): Promise<UserPreferences> {
   try {
     const db = await getDB();
-    const prefs = (await db.get(STORE_PREFERENCES, 'user_prefs')) as UserPreferences | undefined;
-    return prefs || DEFAULT_PREFERENCES;
+    if (db) {
+      const prefs = (await db.get(STORE_PREFERENCES, 'user_prefs')) as UserPreferences | undefined;
+      return prefs || DEFAULT_PREFERENCES;
+    }
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem('user_preferences');
+      if (raw) return JSON.parse(raw);
+    }
+    return DEFAULT_PREFERENCES;
   } catch {
     return DEFAULT_PREFERENCES;
   }
@@ -306,7 +423,12 @@ export async function getPreferences(): Promise<UserPreferences> {
 export async function savePreferences(prefs: UserPreferences): Promise<void> {
   try {
     const db = await getDB();
-    await db.put(STORE_PREFERENCES, prefs, 'user_prefs');
+    if (db) {
+      await db.put(STORE_PREFERENCES, prefs, 'user_prefs');
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('user_preferences', JSON.stringify(prefs));
+    }
   } catch (err) {
     console.warn('[IDB] Errore salvataggio preferenze:', err);
   }

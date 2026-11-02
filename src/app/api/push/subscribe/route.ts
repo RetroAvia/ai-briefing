@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 
+export const dynamic = 'force-dynamic';
+
 interface SubscribeBody {
   endpoint: string;
   p256dh: string;
@@ -9,11 +11,15 @@ interface SubscribeBody {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const body = await req.json() as SubscribeBody;
+    const body = (await req.json()) as SubscribeBody;
     const { endpoint, p256dh, auth } = body;
 
     if (!endpoint || !p256dh || !auth) {
       return NextResponse.json({ error: 'Missing subscription fields' }, { status: 400 });
+    }
+
+    if (!endpoint.startsWith('https://')) {
+      return NextResponse.json({ error: 'Invalid push endpoint URL' }, { status: 400 });
     }
 
     const supabase = createServiceClient();

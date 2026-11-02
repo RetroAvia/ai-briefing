@@ -2,7 +2,11 @@
 
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
-  return await Notification.requestPermission();
+  try {
+    return await Notification.requestPermission();
+  } catch {
+    return 'denied';
+  }
 }
 
 export async function subscribeToNotifications(): Promise<{ success: boolean; error?: string }> {
@@ -21,7 +25,16 @@ export async function subscribeToNotifications(): Promise<{ success: boolean; er
       };
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    // Timeout di 3 secondi per evitare blocchi infiniti su mobile
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout Service Worker')), 3000)),
+    ]);
+
+    if (!registration) {
+      return { success: false, error: 'Service Worker non pronto' };
+    }
+
     let subscription = await registration.pushManager.getSubscription();
 
     // Se non ancora sottoscritto, crea la nuova subscription
@@ -55,7 +68,7 @@ export async function subscribeToNotifications(): Promise<{ success: boolean; er
 
     return { success: true };
   } catch (err: unknown) {
-    console.error('[PUSH] Errore di sottoscrizione:', err);
+    console.warn('[PUSH] Errore di sottoscrizione:', err);
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Impossibile completare la registrazione push',
@@ -69,9 +82,13 @@ export async function unsubscribeFromNotifications(): Promise<{ success: boolean
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    if (!registration) return { success: true };
 
+    const subscription = await registration.pushManager.getSubscription();
     if (!subscription) return { success: true };
 
     // Rimuove dal server
@@ -85,7 +102,7 @@ export async function unsubscribeFromNotifications(): Promise<{ success: boolean
     const unsubscribed = await subscription.unsubscribe();
     return { success: unsubscribed };
   } catch (err: unknown) {
-    console.error('[PUSH] Errore disiscrizione:', err);
+    console.warn('[PUSH] Errore disiscrizione:', err);
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Errore disattivazione notifiche',
@@ -107,13 +124,26 @@ export async function getNotificationStatus(): Promise<{
     return { supported: false, permission: 'denied', subscribed: false };
   }
 
-  const permission = Notification.permission;
+  let permission: NotificationPermission = 'denied';
+  try {
+    permission = Notification.permission;
+  } catch {
+    return { supported: false, permission: 'denied', subscribed: false };
+  }
+
   let subscribed = false;
 
   try {
-    const registration = await navigator.serviceWorker.ready;
-    const sub = await registration.pushManager.getSubscription();
-    subscribed = sub !== null;
+    // Timeout di 1.5s per evitare che rimanga bloccato indefinitamente su smartphone o iOS Safari
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]);
+
+    if (registration && registration.pushManager) {
+      const sub = await registration.pushManager.getSubscription();
+      subscribed = sub !== null;
+    }
   } catch {
     // Silently continue
   }

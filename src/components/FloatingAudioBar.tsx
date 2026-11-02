@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipForward, SkipBack, X, Volume2, Gauge } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, X, Volume2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import type { Article } from '@/types';
 import { triggerHaptic } from '@/lib/export';
@@ -23,7 +23,6 @@ export default function FloatingAudioBar({
   const [speed, setSpeed] = useState<number>(1.1);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Trova indice iniziale
   useEffect(() => {
     if (currentArticleId) {
       const idx = articles.findIndex((a) => a.id === currentArticleId);
@@ -77,6 +76,8 @@ export default function FloatingAudioBar({
 
   const togglePlay = () => {
     triggerHaptic(15);
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !window.speechSynthesis) return;
+
     if (isPlaying) {
       window.speechSynthesis.pause();
       setIsPlaying(false);
@@ -123,7 +124,9 @@ export default function FloatingAudioBar({
 
   const stopAndClose = () => {
     triggerHaptic(15);
-    window.speechSynthesis.cancel();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setIsPlaying(false);
     onClose();
   };
@@ -132,102 +135,98 @@ export default function FloatingAudioBar({
 
   return (
     <motion.div
-      initial={{ y: 80, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="fixed bottom-3 sm:bottom-5 left-3 right-3 sm:left-auto sm:right-5 sm:max-w-lg w-auto z-40 p-3 sm:p-3.5 rounded-2xl border backdrop-blur-2xl shadow-2xl"
+      initial={{ y: 50, opacity: 0, scale: 0.95 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 50, opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+      className="fixed bottom-4 sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:w-[420px] z-50 p-3 sm:p-3.5 rounded-full border shadow-2xl"
       style={{
-        background: 'rgba(15, 18, 28, 0.92)',
-        borderColor: 'rgba(124, 58, 237, 0.35)',
-        boxShadow: '0 15px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(124, 58, 237, 0.25)',
+        background: 'rgba(12, 12, 16, 0.94)',
+        backdropFilter: 'blur(35px) saturate(200%)',
+        WebkitBackdropFilter: 'blur(35px) saturate(200%)',
+        borderColor: 'rgba(255, 255, 255, 0.14)',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.08)',
       }}
     >
-      <div className="flex items-center justify-between gap-3">
-        {/* Left: Animated Icon + Title */}
+      <div className="flex items-center justify-between gap-3 px-1">
+        {/* Left: Waveform Icon + Info */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)',
-              boxShadow: '0 0 12px rgba(124, 58, 237, 0.5)',
-            }}
-          >
-            <Volume2 className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 text-[#2997ff]">
+            <Volume2 className="w-4 h-4" />
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400">
-                Sintesi Vocale ({currentIndex + 1}/{articles.length})
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#2997ff]">
+                In Riproduzione ({currentIndex + 1}/{articles.length})
               </span>
               {isPlaying && (
-                <div className="flex items-center gap-0.5 ml-1">
-                  {[0.5, 1, 0.6, 0.9].map((h, i) => (
+                <div className="flex items-center gap-0.5">
+                  {[0.4, 1, 0.6, 0.8].map((h, i) => (
                     <motion.div
                       key={i}
-                      animate={{ height: ['3px', `${Math.round(h * 12)}px`, '3px'] }}
+                      animate={{ height: ['3px', `${Math.round(h * 11)}px`, '3px'] }}
                       transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
-                      className="w-0.5 bg-cyan-400 rounded-full"
+                      className="w-0.5 bg-[#2997ff] rounded-full"
                     />
                   ))}
                 </div>
               )}
             </div>
-            <p className="text-xs font-bold text-white truncate">{currentArticle.title}</p>
+            <p className="text-xs font-bold text-white truncate tracking-[-0.01em]">
+              {currentArticle.title}
+            </p>
           </div>
         </div>
 
-        {/* Right: Controls (Prev, Play, Next, Speed, Close) */}
+        {/* Right: Controls */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={prevArticle}
             disabled={currentIndex === 0}
-            className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="Notizia precedente"
+            className="p-1.5 text-[#86868b] hover:text-white disabled:opacity-25 transition-colors"
+            title="Precedente"
           >
             <SkipBack className="w-3.5 h-3.5" />
           </button>
 
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
             onClick={togglePlay}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white transition-all shadow-md"
-            style={{
-              background: isPlaying
-                ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
-                : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-            }}
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-black font-bold shadow-md transition-all"
           >
-            {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+            {isPlaying ? (
+              <Pause className="w-3.5 h-3.5 fill-black" />
+            ) : (
+              <Play className="w-3.5 h-3.5 fill-black ml-0.5" />
+            )}
           </motion.button>
 
           <button
             onClick={nextArticle}
             disabled={currentIndex === articles.length - 1}
-            className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="Notizia successiva"
+            className="p-1.5 text-[#86868b] hover:text-white disabled:opacity-25 transition-colors"
+            title="Successiva"
           >
             <SkipForward className="w-3.5 h-3.5" />
           </button>
 
-          {/* Speed Toggle */}
+          {/* Speed Pill */}
           <button
             onClick={cycleSpeed}
-            className="px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors ml-1"
-            title="Velocità di riproduzione"
+            className="px-2 py-0.5 rounded-full text-[10px] font-bold text-[#f5f5f7] bg-white/10 hover:bg-white/20 transition-colors ml-0.5"
+            title="Velocità"
           >
             {speed}x
           </button>
 
-          {/* Close */}
           <button
             onClick={stopAndClose}
-            className="p-1 text-slate-500 hover:text-white transition-colors ml-1"
-            title="Chiudi lettore"
+            className="p-1 text-[#86868b] hover:text-white transition-colors ml-0.5"
+            title="Chiudi"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

@@ -66,7 +66,7 @@ export interface UserPreferences {
   autoPlayAudio: boolean;
 }
 
-// Category display config
+// Category display config con tinte ufficiali Apple HIG (iOS Dark Mode)
 export interface CategoryConfig {
   label: string;
   color: string;
@@ -79,50 +79,50 @@ export interface CategoryConfig {
 export const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
   'Tech & AI': {
     label: 'Tech & AI',
-    color: 'text-cyan-300',
-    bgColor: 'bg-cyan-500/10',
-    borderColor: 'border-cyan-500/30',
-    accentHex: '#06b6d4',
-    badgeGlow: 'rgba(6, 182, 212, 0.4)',
+    color: 'text-[#2997ff]',
+    bgColor: 'bg-[#2997ff]/10',
+    borderColor: 'border-[#2997ff]/30',
+    accentHex: '#2997ff',
+    badgeGlow: 'rgba(41, 151, 255, 0.3)',
   },
   'Mercati & Economia': {
     label: 'Mercati & Economia',
-    color: 'text-emerald-300',
-    bgColor: 'bg-emerald-500/10',
-    borderColor: 'border-emerald-500/30',
-    accentHex: '#10b981',
-    badgeGlow: 'rgba(16, 185, 129, 0.4)',
+    color: 'text-[#30d158]',
+    bgColor: 'bg-[#30d158]/10',
+    borderColor: 'border-[#30d158]/30',
+    accentHex: '#30d158',
+    badgeGlow: 'rgba(48, 209, 88, 0.3)',
   },
   'Geopolitica': {
     label: 'Geopolitica',
-    color: 'text-rose-300',
-    bgColor: 'bg-rose-500/10',
-    borderColor: 'border-rose-500/30',
-    accentHex: '#f43f5e',
-    badgeGlow: 'rgba(244, 63, 94, 0.4)',
+    color: 'text-[#ff375f]',
+    bgColor: 'bg-[#ff375f]/10',
+    borderColor: 'border-[#ff375f]/30',
+    accentHex: '#ff375f',
+    badgeGlow: 'rgba(255, 55, 95, 0.3)',
   },
   'Scienza': {
     label: 'Scienza',
-    color: 'text-violet-300',
-    bgColor: 'bg-violet-500/10',
-    borderColor: 'border-violet-500/30',
-    accentHex: '#8b5cf6',
-    badgeGlow: 'rgba(139, 92, 246, 0.4)',
+    color: 'text-[#bf5af2]',
+    bgColor: 'bg-[#bf5af2]/10',
+    borderColor: 'border-[#bf5af2]/30',
+    accentHex: '#bf5af2',
+    badgeGlow: 'rgba(191, 90, 242, 0.3)',
   },
   'Italia': {
     label: 'Italia',
-    color: 'text-amber-300',
-    bgColor: 'bg-amber-500/10',
-    borderColor: 'border-amber-500/30',
-    accentHex: '#f59e0b',
-    badgeGlow: 'rgba(245, 158, 11, 0.4)',
+    color: 'text-[#ff9f0a]',
+    bgColor: 'bg-[#ff9f0a]/10',
+    borderColor: 'border-[#ff9f0a]/30',
+    accentHex: '#ff9f0a',
+    badgeGlow: 'rgba(255, 159, 10, 0.3)',
   },
   'Altro': {
     label: 'Altro',
-    color: 'text-slate-300',
-    bgColor: 'bg-slate-500/10',
-    borderColor: 'border-slate-500/30',
-    accentHex: '#94a3b8',
-    badgeGlow: 'rgba(148, 163, 184, 0.3)',
+    color: 'text-[#98989d]',
+    bgColor: 'bg-[#98989d]/10',
+    borderColor: 'border-[#98989d]/30',
+    accentHex: '#98989d',
+    badgeGlow: 'rgba(152, 152, 157, 0.25)',
   },
 };

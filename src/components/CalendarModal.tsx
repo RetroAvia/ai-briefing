@@ -12,6 +12,39 @@ interface CalendarModalProps {
   onSelectDate: (date: string) => void;
 }
 
+function formatSafeModalDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('T')[0]?.split('-');
+    if (parts && parts.length === 3) {
+      const year = parseInt(parts[0]!, 10);
+      const month = parseInt(parts[1]!, 10) - 1;
+      const day = parseInt(parts[2]!, 10);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return new Intl.DateTimeFormat('it-IT', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }).format(d);
+      }
+    }
+    const fallback = new Date(dateStr);
+    if (!isNaN(fallback.getTime())) {
+      return new Intl.DateTimeFormat('it-IT', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(fallback);
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function CalendarModal({
   isOpen,
   onClose,
@@ -74,17 +107,7 @@ export default function CalendarModal({
           ) : (
             availableDates.map((dateStr) => {
               const isSelected = dateStr === currentDate;
-              let formattedDate = dateStr;
-              try {
-                formattedDate = new Intl.DateTimeFormat('it-IT', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                }).format(new Date(dateStr + 'T00:00:00'));
-              } catch {
-                formattedDate = dateStr;
-              }
+              const formattedDate = formatSafeModalDate(dateStr);
 
               return (
                 <button
